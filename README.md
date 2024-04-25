@@ -1,1 +1,1 @@
-# Visualizing Semantically Aggregated Ensamble Data in Meteorology
+# Semantically Aggregated Ensemble Visualisation in Meteorology
