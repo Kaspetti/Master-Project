@@ -2,7 +2,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
-from sklearn.decomposition import PCA
 
 matplotlib.use("TkAgg")
 
@@ -58,8 +57,5 @@ for solution in solutions:
 for solution in downsampled_solutions:
     plt.plot(solution[0], solution[1])
 
-pca = PCA(n_components=2)
-
-#principalComponents = pca.fit_transform(solutions)
 
 plt.show()
