@@ -8,8 +8,8 @@ matplotlib.use("TkAgg")
 
 def vector_field(t, y):
     x, y = y
-    dx_dt = 2*x + np.power(y, 2)
-    dy_dt = np.power(x, 2) - y
+    dx_dt = 2*x + y**2
+    dy_dt = x**2 - y
 
     return [dx_dt, dy_dt]
 
