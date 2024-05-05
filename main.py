@@ -28,7 +28,7 @@ plt.xlim(-3, 5)
 plt.ylim(-2, 5)
 plt.grid(True)
 
-t = np.linspace(0, 10, 100)
+t = np.linspace(0, 10, 1000)
 xs = np.linspace(-0.9, -0.85, 20)
 ys = np.repeat(-2.0, 20)
 
