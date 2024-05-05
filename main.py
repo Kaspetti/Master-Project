@@ -1,15 +1,15 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.integrate import odeint
+from scipy.integrate import solve_ivp
 
 matplotlib.use("TkAgg")
 
 
-def vector_field(y, t):
+def vector_field(t, y):
     x, y = y
-    dx_dt = 2*x+y
-    dy_dt = x-y
+    dx_dt = 2*x + np.power(y, 2)
+    dy_dt = np.power(x, 2) - y
 
     return [dx_dt, dy_dt]
 
@@ -18,7 +18,7 @@ x = np.linspace(-2, 2, 10)
 y = np.linspace(-2, 2, 10)
 X, Y = np.meshgrid(x, y)
 
-U, V = vector_field((X, Y), 0)
+U, V = vector_field(0, (X, Y))
 
 plt.quiver(X, Y, U, V, scale=20)
 plt.xlabel('x')
@@ -29,15 +29,15 @@ plt.ylim(-2, 2)
 plt.grid(True)
 
 t = np.linspace(0, 10, 100)
-xs = np.linspace(0.6, 0.65, 20)
+xs = np.linspace(-0.9, -0.85, 20)
 ys = np.repeat(-2.0, 20)
 
 y0s = [[x, y] for x, y in zip(xs, ys)]
 
-solutions = [odeint(vector_field, y0, t) for y0 in y0s]
+solutions = [solve_ivp(vector_field, (0, 10), y0, method="RK45", t_eval=t) for y0 in y0s]
 
 for solution in solutions:
-    x_solution, y_solution = solution[:, 0], solution[:, 1]
-    plt.plot(x_solution, y_solution)
+    #x_solution, y_solution = solution[:, 0], solution[:, 1]
+    plt.plot(solution.y[0], solution.y[1])
 
 plt.show()
