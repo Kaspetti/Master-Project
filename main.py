@@ -14,18 +14,18 @@ def vector_field(t, y):
     return [dx_dt, dy_dt]
 
 
-x = np.linspace(-2, 2, 10)
-y = np.linspace(-2, 2, 10)
+x = np.linspace(-3, 5, 10)
+y = np.linspace(-2, 5, 10)
 X, Y = np.meshgrid(x, y)
 
 U, V = vector_field(0, (X, Y))
 
-plt.quiver(X, Y, U, V, scale=20)
+plt.quiver(X, Y, U, V, scale=200)
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Flow Field: F(x, y) = (2*x+y, x-y)')
-plt.xlim(-2, 2)
-plt.ylim(-2, 2)
+plt.title('Flow Field: F(x, y) = (2*x + y**2, x**2 - y)')
+plt.xlim(-3, 5)
+plt.ylim(-2, 5)
 plt.grid(True)
 
 t = np.linspace(0, 10, 100)
@@ -37,7 +37,6 @@ y0s = [[x, y] for x, y in zip(xs, ys)]
 solutions = [solve_ivp(vector_field, (0, 10), y0, method="RK45", t_eval=t) for y0 in y0s]
 
 for solution in solutions:
-    #x_solution, y_solution = solution[:, 0], solution[:, 1]
     plt.plot(solution.y[0], solution.y[1])
 
 plt.show()
