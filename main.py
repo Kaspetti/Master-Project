@@ -8,13 +8,13 @@ from sklearn.decomposition import PCA
 matplotlib.use("TkAgg")
 
 
+# The function of the flow field
 def vector_field(t, y):
     x, y = y
     dx_dt = 2*x + y**2
     dy_dt = x**2 - y
 
     return [dx_dt, dy_dt]
-
 
 x = np.linspace(-3, 5, 10)
 y = np.linspace(-2, 5, 10)
@@ -41,8 +41,8 @@ y0s = [[x, y] for x, y in zip(xs, ys)]
 solutions = [solve_ivp(vector_field, (0, 10), y0, method="RK45", t_eval=t) for y0 in y0s]
 solutions = [solution.y for solution in solutions]
 
+# Downsample the solutions in order to get lines of the same dimension
 min_len = min(len(solution[0]) for solution in solutions)
-
 downsampled_solutions = []
 for solution in solutions:
     downsampled_solution = [[], []]
@@ -57,7 +57,7 @@ for solution in solutions:
 
     downsampled_solutions.append(downsampled_solution)
 
-
+# Plot the downsampled solutions
 for solution in downsampled_solutions:
     axis[0].plot(solution[0], solution[1])
 
