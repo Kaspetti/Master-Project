@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.integrate import solve_ivp
 from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 
 
 matplotlib.use("TkAgg")
@@ -57,10 +58,6 @@ for solution in solutions:
 
     downsampled_solutions.append(downsampled_solution)
 
-# Plot the downsampled solutions
-for solution in downsampled_solutions:
-    axis[0].plot(solution[0], solution[1])
-
 
 # PCA Test
 reshaped_data = np.reshape(downsampled_solutions, (50, -1))
@@ -68,9 +65,18 @@ reshaped_data = np.reshape(downsampled_solutions, (50, -1))
 pca = PCA(n_components=2)
 projected_data = pca.fit_transform(reshaped_data)
 
-axis[1].scatter(projected_data[:, 0], projected_data[:, 1])
+kmeans = KMeans(n_clusters=3)
+kmeans.fit(projected_data)
+
+axis[1].scatter(projected_data[:, 0], projected_data[:, 1], c=kmeans.labels_)
 axis[1].set_xlabel('Principal Component 1')
 axis[1].set_ylabel('Principal Component 2')
 axis[1].set_title('Scatter Plot of Projected Lines')
+
+
+colors = ["blue", "red", "green"]
+# Plot the downsampled solutions
+for i, solution in enumerate(downsampled_solutions):
+    axis[0].plot(solution[0], solution[1], color=colors[kmeans.labels_[i]])
 
 plt.show()
