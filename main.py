@@ -1,5 +1,6 @@
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
 from scipy.integrate import solve_ivp
 from sklearn.decomposition import PCA
@@ -72,21 +73,26 @@ projected_data = pca.fit_transform(reshaped_data)
 kmeans = KMeans(n_clusters=2)
 kmeans.fit(projected_data)
 
-axis[1].scatter(projected_data[:, 0], projected_data[:, 1], c=kmeans.labels_)
+cluster_colors = ["blue", "red"]
+center_colors = ["cyan", "orange"]
+
+cmap = mcolors.ListedColormap(cluster_colors)
+axis[1].scatter(projected_data[:, 0], projected_data[:, 1], c=kmeans.labels_, cmap=cmap)
 axis[1].set_xlabel('Principal Component 1')
 axis[1].set_ylabel('Principal Component 2')
 axis[1].set_title('Scatter Plot of Projected Lines')
 
-colors = ["blue", "red", "orange"]
 # Plot the downsampled solutions
 for i, solution in enumerate(interpolated_solutions):
-    axis[0].plot(solution[0], solution[1], color=colors[kmeans.labels_[i]])
+    axis[0].plot(solution[0], solution[1], color=cluster_colors[kmeans.labels_[i]])
 
+axis[1].scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], c=center_colors, s=100)
 
-# for center in kmeans.cluster_centers_:
-#     center_line = center @ pca.components_
-#     center_line = np.reshape(center_line, (point_amount, 2))
-#     axis[0].plot(center_line[:, 0], center_line[:, 1], color="orange", linewidth=5)
+for i, center in enumerate(kmeans.cluster_centers_):
+    center_line = pca.inverse_transform(center)
+
+    center_line = np.reshape(center_line, (2, point_amount))
+    axis[0].plot(center_line[0], center_line[1], color=center_colors[i], linewidth=3)
 
 
 plt.show()
