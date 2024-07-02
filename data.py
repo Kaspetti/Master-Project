@@ -2,7 +2,7 @@ from netCDF4 import Dataset
 
 
 def get_coords(line_id, time):
-    rootgrp = Dataset("./ec.ensctrl.2024061912.sfc.mta.nc", "r")
+    rootgrp = Dataset("./2024070112/ec.ens_00.2024070112.sfc.mta.nc", "r")
 
     line_id_indices = rootgrp["line_id"][:] == line_id
     time_indices = rootgrp["date"][:] == time
