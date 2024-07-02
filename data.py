@@ -1,8 +1,11 @@
 from netCDF4 import Dataset
 
 
-def get_coords(line_id, time):
-    rootgrp = Dataset("./2024070112/ec.ens_00.2024070112.sfc.mta.nc", "r")
+def get_coords(ens_id, line_id, time):
+    rootgrp = Dataset(
+            f"./2024070112/ec.ens_{ens_id:02d}.2024070112.sfc.mta.nc",
+            "r"
+    )
 
     line_id_indices = rootgrp["line_id"][:] == line_id
     time_indices = rootgrp["date"][:] == time
@@ -17,3 +20,15 @@ def get_coords(line_id, time):
     rootgrp.close()
 
     return coords
+
+
+def get_line_amount(ens_id, time):
+    rootgrp = Dataset(
+            f"./2024070112/ec.ens_{ens_id:02d}.2024070112.sfc.mta.nc",
+            "r"
+    )
+
+    line_count = len(set(rootgrp["line_id"][:]))
+    rootgrp.close()
+
+    return line_count
