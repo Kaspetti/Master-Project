@@ -7,7 +7,7 @@ async function init() {
   const color = d3.scaleOrdinal(d3.schemeCategory10)
 
   // Handler for box select. BoxZoom but without zoom
-  L.Map.BoxSelectHandler = L.Handler.extend({
+  L.Map.BoxSelectHandler = L.Map.BoxZoom.extend({
     initialize: function (map) {
       this._map = map;
       this._container = map._container;
@@ -111,6 +111,7 @@ async function init() {
   }).addTo(map);
 
   let lines = []
+  let selection = []
 
   const time = 0
   for (let ensId = 0; ensId < 50; ensId++) {
@@ -133,12 +134,17 @@ async function init() {
   alert("Loaded all lines")
 
   map.on("boxselectend", function(e) {
-    console.log(e.boxZoomBounds)
+    selection.forEach(function(line) {
+      line.line.setStyle({color: line.color})
+    })
+
+    selection = []
 
     for (let i = 0; i < lines.length; i++) {
       const coords = lines[i].getLatLngs()
       for (let j = 0; j < coords.length; j++) {
         if (e.boxZoomBounds.contains([coords[j].lat, coords[j].lng])) {
+          selection.push({line: lines[i], color: lines[i].options.color})
           lines[i].setStyle({color: "red"})
           break
         }
