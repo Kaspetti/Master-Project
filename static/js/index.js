@@ -145,12 +145,12 @@ async function init() {
 async function showLines(date) {
   const color = d3.scaleOrdinal(d3.schemeCategory10)
 
-  lineLayer.clearLayers()
 
   let lines = []
   let selection = []
 
   const ls = await d3.json(`/api/all-lines?date=${date}`)
+  lineLayer.clearLayers()
 
   ls.forEach(function (l) {
     const latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
