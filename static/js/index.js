@@ -113,25 +113,13 @@ async function init() {
   let lines = []
   let selection = []
 
-  const time = 0
-  for (let ensId = 0; ensId < 50; ensId++) {
-    const lineId = 4
-    const coords = await d3.json(`/api/coords?ens-id=${ensId}&line-id=${lineId}&time=${time}`)
-    const latLons = coords.map(coord => [coord.latitude, coord.longitude])
+  const date = 0
+  const ls = await d3.json(`/api/all-lines?date=${date}`)
 
-    lines.push(L.polyline(latLons, {color: color(lineId), weight: 1}).addTo(map))
-
-    // const lineCount = await d3.json(`/api/line-count?ens-id=${ensId}&time=${time}`)
-    //
-    // for (let lineId = 1; lineId <= lineCount; lineId++) {
-    //   const coords = await d3.json(`/api/coords?ens-id=${ensId}&line-id=${lineId}&time=${time}`)
-    //   const latLons = coords.map(coord => [coord.latitude, coord.longitude])
-    //
-    //   lines.push(L.polyline(latLons, {color: color(lineId), weight: 1}).addTo(map))
-    // }
-  }
-
-  alert("Loaded all lines")
+  ls.forEach(function (l) {
+    const latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
+    lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(map))
+  })
 
   map.on("boxselectend", function(e) {
     selection.forEach(function(line) {

@@ -32,3 +32,26 @@ def get_line_amount(ens_id, time):
     rootgrp.close()
 
     return line_count
+
+
+def get_all_lines(time):
+    all_lines = []
+
+    for i in range(50):
+        print(i)
+        rootgrp = Dataset(
+                f"./2024070112/ec.ens_{i:02d}.2024070112.sfc.mta.nc",
+                "r"
+        )
+
+        time_indices = rootgrp["date"][:] == time
+
+        latitudes = rootgrp["latitude"][time_indices]
+        longitudes = rootgrp["longitude"][time_indices]
+
+        all_lines.append([{"latitude": float(lat), "longitude": float(lon)}
+                          for lat, lon in zip(latitudes, longitudes)])
+
+        rootgrp.close()
+
+    return all_lines
