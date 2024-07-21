@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -46,67 +47,77 @@ func main() {
             }
         }
 
+        lines, err := getAllLines(date)
+        if err != nil {
+            ctx.JSON(http.StatusInternalServerError, gin.H{})
+            return
+        }
 
-        ctx.JSON(http.StatusOK, getAllLines(date))
+        ctx.JSON(http.StatusOK, lines)
     })
 
     r.Run()
 }
 
 
-func getAllLines(date int64) []Line {
+func getAllLines(date int64) ([]Line, error) {
     allLines := make([]Line, 0)
     for i := 0; i < 50; i++ {
-        allLines = append(allLines, getLines(int64(i), date)...)
+        lines, err := getLines(int64(i), date)
+        if err != nil {
+            return nil, err
+        }
+
+        allLines = append(allLines, lines...)
     }
 
-    return allLines
+    return allLines, nil
 }
 
 
-func getLines(ensId int64, date int64) []Line {
+func getLines(ensId int64, date int64) ([]Line, error) {
+    // Opens the netCDF file of the ensamble member of id 'ensId'
     nc, err := netcdf.Open(fmt.Sprintf("./2024070112/ec.ens_%02d.2024070112.sfc.mta.nc", ensId))
     if err != nil {
-        panic(err)
+        return nil, err
     }
     defer nc.Close() 
 
     latVr, err := nc.GetVariable("latitude")
     if err != nil {
-        panic(err)
+        return nil, err
     }
     lats, ok := latVr.Values.([]float64)
     if !ok {
-        fmt.Println("Lul lats wrong")
+        return nil, errors.New("Latitudes were not of type 'float64'")
     }
 
     lonVr, err := nc.GetVariable("longitude")
     if err != nil {
-        panic(err)
+        return nil, err
     }
     lons, ok := lonVr.Values.([]float64)
     if !ok {
-        fmt.Println("Lul lons wrong")
+        return nil, errors.New("Longitudes were not of type 'float64'")
     }
 
     idVr, err := nc.GetVariable("line_id")
     if err != nil {
-        panic(err)
+        return nil, err
     }
     ids, ok := idVr.Values.([]int64)
     if !ok {
-        fmt.Println("Lul ids wrong")
+        return nil, errors.New("Line ids were not of type 'int64'")
     }
 
     dateVr, err := nc.GetVariable("date")
     if err != nil {
-        panic(err)
+        return nil, err
     }
     dates, ok := dateVr.Values.([]int64)
     if !ok {
-        fmt.Println("Lul dates wrong")
+        return nil, errors.New("Dates were not of type 'int64'")
     }
-
 
     lines := make([]Line, 0)
     for i := 0; i < len(ids); i++ {
@@ -127,5 +138,5 @@ func getLines(ensId int64, date int64) []Line {
         }
     }
 
-    return lines
+    return lines, nil
 }

@@ -1,10 +1,36 @@
 /// <reference types="leaflet" />
 
+const dateSlider = document.getElementById("date-slider")
+const dateSliderLabel = document.getElementById("date-slider-label")
+
+let updating = false
+let updatingValue = 0
+async function onSliderChange() {
+  if (updating) {
+    dateSlider.value = updatingValue
+    return
+  }
+  updating = true
+  updatingValue = dateSlider.value
+
+  if (dateSlider.value > 78) {
+    dateSlider.step = 6
+  } else {
+    dateSlider.step = 3
+  }
+
+  dateSliderLabel.innerText = dateSlider.value
+
+  await showLines(dateSlider.value)
+
+  updating = false
+}
+
 
 let map
+let lineLayer
 
 async function init() {
-  const color = d3.scaleOrdinal(d3.schemeCategory10)
 
   // Handler for box select. BoxZoom but without zoom
   L.Map.BoxSelectHandler = L.Map.BoxZoom.extend({
@@ -110,15 +136,25 @@ async function init() {
     attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
 
+  lineLayer = L.layerGroup().addTo(map)
+
+  await showLines(0)
+}
+
+
+async function showLines(date) {
+  const color = d3.scaleOrdinal(d3.schemeCategory10)
+
+  lineLayer.clearLayers()
+
   let lines = []
   let selection = []
 
-  const date = 0
   const ls = await d3.json(`/api/all-lines?date=${date}`)
 
   ls.forEach(function (l) {
     const latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
-    lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(map))
+    lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(lineLayer))
   })
 
   map.on("boxselectend", function(e) {
