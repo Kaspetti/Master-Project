@@ -13,7 +13,7 @@ async function onSliderChange() {
   updating = true
   updatingValue = dateSlider.value
 
-  if (dateSlider.value > 78) {
+  if (dateSlider.value > 72) {
     dateSlider.step = 6
   } else {
     dateSlider.step = 3
@@ -29,6 +29,8 @@ async function onSliderChange() {
 
 let map
 let lineLayer
+
+let cachedLines = {}
 
 async function init() {
 
@@ -145,11 +147,15 @@ async function init() {
 async function showLines(date) {
   const color = d3.scaleOrdinal(d3.schemeCategory10)
 
-
   let lines = []
   let selection = []
 
-  const ls = await d3.json(`/api/all-lines?date=${date}`)
+  let ls = cachedLines[date]
+  if (!ls) {
+    ls = await d3.json(`/api/all-lines?date=${date}`)
+    cachedLines[date] = ls
+  }
+
   lineLayer.clearLayers()
 
   ls.forEach(function (l) {
