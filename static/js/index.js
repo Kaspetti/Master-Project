@@ -140,6 +140,24 @@ async function init() {
 
   lineLayer = L.layerGroup().addTo(map)
 
+  // Fetches all data asynchronously and caches it
+  async function fetchAllData() {
+    let date = 0
+    while (date <= 240) {
+      if (!cachedLines[date]) {
+        let ls = await d3.json(`/api/all-lines?date=${date}`)
+        cachedLines[date] = ls
+      }
+
+      if (date < 72) {
+        date += 3
+      } else {
+        date += 6
+      }
+    }
+  }
+  fetchAllData()
+
   await showLines(0)
 }
 
