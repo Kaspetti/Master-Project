@@ -159,7 +159,17 @@ async function showLines(date) {
   lineLayer.clearLayers()
 
   ls.forEach(function (l) {
-    const latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
+    const min = Math.min(...l.coords.map(coord => coord.longitude))
+    const max = Math.max(...l.coords.map(coord => coord.longitude))
+
+    let latLons
+    // If it crosses the anti meridian add 360 to the negative values
+    if (max - min > 180) {
+      latLons = l.coords.map(coord => [coord.latitude, coord.longitude < 0 ? coord.longitude + 360 : coord.longitude])
+    } else {
+      latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
+    }
+
     lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(lineLayer))
   })
 
