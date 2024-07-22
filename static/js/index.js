@@ -29,6 +29,7 @@ async function onSliderChange() {
 
 let map
 let lineLayer
+let aggregateLayer
 
 let cachedLines = {}
 
@@ -139,6 +140,7 @@ async function init() {
   }).addTo(map);
 
   lineLayer = L.layerGroup().addTo(map)
+  aggregateLayer = L.layerGroup().addTo(map)
 
   // Fetches all data asynchronously and caches it
   async function fetchAllData() {
@@ -208,7 +210,55 @@ async function showLines(date) {
         }
       }
     }
+    
+    getCentroidLine(structuredClone(selection.map(l => l.line._latlngs)))
   })
+}
+
+
+function getCentroidLine(selection) {
+  aggregateLayer.clearLayers()
+
+  const maxLength = Math.max(...selection.map(l => l.length))
+  // const paddedSelection = selection.map(l => l.concat(Array(maxLength - l.length).fill(l[l.length-1])))
+  const paddedSelection = selection.map(l => padLine(l, maxLength))
+
+  const lineCount = paddedSelection.length
+
+  let average = paddedSelection[0].map(point => ({lat: point.lat, lng: point.lng}));
+
+  paddedSelection.slice(1).forEach(function(l) {
+    for (let i = 0; i < maxLength; i++) {
+      average[i].lat += l[i].lat
+      average[i].lng += l[i].lng
+    }
+  })
+
+  average = average.map(coords => [coords.lat / lineCount, coords.lng / lineCount])
+  L.polyline(average, {color: "blue", weight: 3}).addTo(aggregateLayer)
+}
+
+
+function padLine(line, length) {
+  if (length - line.length == 0) {
+    return line
+  }
+
+  let padding = Array(length - line.length)
+
+  let lastElem = line[line.length-1]
+
+  let dLat = lastElem.lat - line[line.length - 2].lat
+  let dLng = lastElem.lng - line[line.length - 2].lng
+  
+  for (let i = 0; i < padding.length; i++) {
+    padding[i] = {
+      lat: lastElem.lat + (dLat * (i + 1)),
+      lng: lastElem.lng + (dLng * (i + 1)),
+    }
+  }
+
+  return line.concat(padding)
 }
 
 
