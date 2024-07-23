@@ -3,6 +3,8 @@
 const dateSlider = document.getElementById("date-slider")
 const dateSliderLabel = document.getElementById("date-slider-label")
 
+const playButton = document.getElementById("play-button")
+
 let updating = false
 let updatingValue = 0
 async function onSliderChange() {
@@ -24,6 +26,39 @@ async function onSliderChange() {
   await showLines(dateSlider.value)
 
   updating = false
+}
+
+
+let isPlaying = false
+let currentTime = 0
+let playInterval
+function playButtonPressed() {
+  isPlaying = !isPlaying
+
+  if (isPlaying) {
+    playButton.innerText = "Stop"
+    dateSlider.disabled = true
+
+    playInterval = setInterval(function() {
+      let currentTime = parseInt(dateSlider.value)
+
+      if (currentTime >= 72) {
+        currentTime += 6
+      } else {
+        currentTime += 3
+      }
+      if (currentTime > 240) { currentTime = 0 }
+
+      dateSlider.value = currentTime
+      dateSliderLabel.innerText = currentTime
+      showLines(currentTime)
+    }, 100)
+  } else {
+    playButton.innerText = "Play"
+    dateSlider.disabled = false
+
+    clearInterval(playInterval)
+  }
 }
 
 
@@ -164,6 +199,7 @@ async function init() {
 }
 
 
+let boxSelectHandler
 async function showLines(date) {
   const color = d3.scaleOrdinal(d3.schemeCategory10)
 
@@ -193,7 +229,13 @@ async function showLines(date) {
     lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(lineLayer))
   })
 
-  map.on("boxselectend", function(e) {
+  if (boxSelectHandler) {
+    map.off("boxselectend", boxSelectHandler)
+  }
+
+  boxSelectHandler = function(e) {
+    aggregateLayer.clearLayers()
+
     selection.forEach(function(line) {
       line.line.setStyle({color: line.color})
     })
@@ -210,31 +252,33 @@ async function showLines(date) {
         }
       }
     }
-    
-    getCentroidLine(structuredClone(selection.map(l => l.line._latlngs)))
-  })
+
+
+    if (selection.length > 0) {
+      getCentroidLine(structuredClone(selection.map(l => l.line._latlngs)))
+    }
+  }
+
+  map.on("boxselectend", boxSelectHandler)
 }
 
 
 function getCentroidLine(selection) {
-  aggregateLayer.clearLayers()
+  const minLength = Math.min(...selection.map(l => l.length))
+  const sampledSelection = selection.map(l => sampleLine(l, minLength))
 
-  const maxLength = Math.max(...selection.map(l => l.length))
-  // const paddedSelection = selection.map(l => l.concat(Array(maxLength - l.length).fill(l[l.length-1])))
-  const paddedSelection = selection.map(l => padLine(l, maxLength))
+  const lineCount = sampledSelection.length
 
-  const lineCount = paddedSelection.length
+  let average = sampledSelection[0].map(coord => ([coord.lat, coord.lng]));
 
-  let average = paddedSelection[0].map(point => ({lat: point.lat, lng: point.lng}));
-
-  paddedSelection.slice(1).forEach(function(l) {
-    for (let i = 0; i < maxLength; i++) {
-      average[i].lat += l[i].lat
-      average[i].lng += l[i].lng
+  sampledSelection.slice(1).forEach(function(l) {
+    for (let i = 0; i < minLength; i++) {
+      average[i][0] += l[i].lat
+      average[i][1] += l[i].lng
     }
   })
 
-  average = average.map(coords => [coords.lat / lineCount, coords.lng / lineCount])
+  average = average.map(coords => [coords[0] / lineCount, coords[1] / lineCount])
   L.polyline(average, {color: "blue", weight: 3}).addTo(aggregateLayer)
 }
 
@@ -259,6 +303,19 @@ function padLine(line, length) {
   }
 
   return line.concat(padding)
+}
+
+
+function sampleLine(line, samples) {
+  const step = (line.length - 1) / (samples - 1);
+
+  let newLine = [];
+  for (let i = 0; i < samples; i++) {
+    const index = Math.min(Math.round(i * step), line.length - 1);
+    newLine.push(line[index]);
+  }
+
+  return newLine;
 }
 
 
