@@ -226,7 +226,9 @@ async function showLines(date) {
       latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
     }
 
-    lines.push(L.polyline(latLons, {color: color(l.id), weight: 1}).addTo(lineLayer))
+    let line = L.polyline(latLons, {weight: 1}).addTo(lineLayer)
+    line.setStyle({color: color(line._leaflet_id)})
+    lines.push(line)
   })
 
   if (boxSelectHandler) {
@@ -236,18 +238,13 @@ async function showLines(date) {
   boxSelectHandler = function(e) {
     aggregateLayer.clearLayers()
 
-    selection.forEach(function(line) {
-      line.line.setStyle({color: line.color})
-    })
-
     selection = []
 
     for (let i = 0; i < lines.length; i++) {
       const coords = lines[i].getLatLngs()
       for (let j = 0; j < coords.length; j++) {
         if (e.boxZoomBounds.contains([coords[j].lat, coords[j].lng])) {
-          selection.push({line: lines[i], color: lines[i].options.color})
-          lines[i].setStyle({color: "red"})
+          selection.push(lines[i])
           break
         }
       }
@@ -255,7 +252,20 @@ async function showLines(date) {
 
 
     if (selection.length > 0) {
-      getCentroidLine(structuredClone(selection.map(l => l.line._latlngs)))
+      lines.forEach(function(l) {
+        l.setStyle({color: "#9999"})
+      })
+
+      selection.forEach(function(l) {
+        l.setStyle({color: "red"})
+      })
+      console.log(lines)
+
+      getCentroidLine(structuredClone(selection.map(l => l._latlngs)))
+    } else {
+      lines.forEach(function(l) {
+        l.setStyle({color: color(l._leaflet_id)})
+      })
     }
   }
 
