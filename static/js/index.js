@@ -72,21 +72,21 @@ async function init() {
 
   // Handler for box select. BoxZoom but without zoom
   L.Map.BoxSelectHandler = L.Map.BoxZoom.extend({
-    initialize: function (map) {
+    initialize: function(map) {
       this._map = map;
       this._container = map._container;
       this._pane = map._panes.overlayPane;
     },
 
-    addHooks: function () {
+    addHooks: function() {
       L.DomEvent.on(this._container, 'mousedown', this._onMouseDown, this);
     },
 
-    removeHooks: function () {
+    removeHooks: function() {
       L.DomEvent.off(this._container, 'mousedown', this._onMouseDown);
     },
 
-    _onMouseDown: function (e) {
+    _onMouseDown: function(e) {
       if (!e.shiftKey || ((e.which !== 1) && (e.button !== 1))) { return false; }
 
       L.DomUtil.disableTextSelection();
@@ -107,7 +107,7 @@ async function init() {
       this._map.fire('boxselectstart');
     },
 
-    _onMouseMove: function (e) {
+    _onMouseMove: function(e) {
       var startPoint = this._startLayerPoint,
         box = this._box,
 
@@ -121,11 +121,11 @@ async function init() {
       L.DomUtil.setPosition(box, newPos);
 
       // TODO refactor: remove hardcoded 4 pixels
-      box.style.width  = (Math.max(0, Math.abs(offset.x) - 4)) + 'px';
+      box.style.width = (Math.max(0, Math.abs(offset.x) - 4)) + 'px';
       box.style.height = (Math.max(0, Math.abs(offset.y) - 4)) + 'px';
     },
 
-    _finish: function () {
+    _finish: function() {
       this._pane.removeChild(this._box);
       this._container.style.cursor = '';
 
@@ -137,7 +137,7 @@ async function init() {
         .off(document, 'keydown', this._onKeyDown);
     },
 
-    _onMouseUp: function (e) {
+    _onMouseUp: function(e) {
       this._finish();
 
       var map = this._map,
@@ -154,7 +154,7 @@ async function init() {
       });
     },
 
-    _onKeyDown: function (e) {
+    _onKeyDown: function(e) {
       if (e.keyCode === 27) {
         this._finish();
       }
@@ -214,7 +214,7 @@ async function showLines(date) {
 
   lineLayer.clearLayers()
 
-  ls.forEach(function (l) {
+  ls.forEach(function(l) {
     const min = Math.min(...l.coords.map(coord => coord.longitude))
     const max = Math.max(...l.coords.map(coord => coord.longitude))
 
@@ -226,8 +226,8 @@ async function showLines(date) {
       latLons = l.coords.map(coord => [coord.latitude, coord.longitude])
     }
 
-    let line = L.polyline(latLons, {weight: 1}).addTo(lineLayer)
-    line.setStyle({color: color(line._leaflet_id)})
+    let line = L.polyline(latLons, { weight: 1 }).addTo(lineLayer)
+    line.setStyle({ color: color(line._leaflet_id) })
     lines.push(line)
   })
 
@@ -253,18 +253,18 @@ async function showLines(date) {
 
     if (selection.length > 0) {
       lines.forEach(function(l) {
-        l.setStyle({color: "#9999"})
+        l.setStyle({ color: "#9999" })
       })
 
       selection.forEach(function(l) {
-        l.setStyle({color: "red"})
+        l.setStyle({ color: "red" })
       })
       console.log(lines)
 
       getCentroidLine(structuredClone(selection.map(l => l._latlngs)))
     } else {
       lines.forEach(function(l) {
-        l.setStyle({color: color(l._leaflet_id)})
+        l.setStyle({ color: color(l._leaflet_id) })
       })
     }
   }
@@ -289,32 +289,8 @@ function getCentroidLine(selection) {
   })
 
   average = average.map(coords => [coords[0] / lineCount, coords[1] / lineCount])
-  L.polyline(average, {color: "blue", weight: 3}).addTo(aggregateLayer)
+  L.polyline(average, { color: "blue", weight: 3 }).addTo(aggregateLayer)
 }
-
-
-function padLine(line, length) {
-  if (length - line.length == 0) {
-    return line
-  }
-
-  let padding = Array(length - line.length)
-
-  let lastElem = line[line.length-1]
-
-  let dLat = lastElem.lat - line[line.length - 2].lat
-  let dLng = lastElem.lng - line[line.length - 2].lng
-  
-  for (let i = 0; i < padding.length; i++) {
-    padding[i] = {
-      lat: lastElem.lat + (dLat * (i + 1)),
-      lng: lastElem.lng + (dLng * (i + 1)),
-    }
-  }
-
-  return line.concat(padding)
-}
-
 
 function sampleLine(line, samples) {
   const step = (line.length - 1) / (samples - 1);
