@@ -250,16 +250,25 @@ async function showLines(date) {
       }
     }
 
-
     if (selection.length > 0) {
       lines.forEach(function(l) {
         l.setStyle({ color: "#9999" })
       })
 
+      const min = Math.min(...selection.map(line => Math.min(...line._latlngs.map(coord => coord.lng))))
+      const max = Math.max(...selection.map(line => Math.max(...line._latlngs.map(coord => coord.lng))))
+
+      const desiredPoints = 10
+      const spacing = (max - min) / (desiredPoints - 1)
+      let X = []
+      for (let i = min; i < max; i += spacing) {
+        X.push(i)
+      }
+
       selection.forEach(function(l) {
-        l.setStyle({ color: "red" })
+        // l.setStyle({ color: "red" })
+        interpolateLine(l, X)
       })
-      console.log(lines)
 
       getCentroidLine(structuredClone(selection.map(l => l._latlngs)))
     } else {
@@ -267,6 +276,7 @@ async function showLines(date) {
         l.setStyle({ color: color(l._leaflet_id) })
       })
     }
+
   }
 
   map.on("boxselectend", boxSelectHandler)
@@ -302,6 +312,31 @@ function sampleLine(line, samples) {
   }
 
   return newLine;
+}
+
+// Does not work for multivalued functions
+function interpolateLine(line, X) {
+  let coords = line._latlngs.sort(function(c1, c2) {
+    return c1.lng > c2.lng
+  })
+
+  let interpolatedLine = []
+  // TODO: Extrapolation at i=0 and i=length
+  X.forEach(function(x) {
+    for (let i = 0; i < coords.length-1; i++) {
+      if (x == coords[i].lng) { 
+        interpolatedLine.push(coords[i])
+      } else if (x > coords[i].lng && x < coords[i+1].lng) {
+        const c1 = coords[i]
+        const c2 = coords[i+1]
+
+        const lat = (c1.lat * (c2.lng - x) + c2.lat * (x - c1.lng)) / (c2.lng - c1.lng)
+        interpolatedLine.push({lat: lat, lng: x})
+      }
+    }
+  })
+
+  L.polyline(interpolatedLine, { color: "green", weight: 1 }).addTo(aggregateLayer)
 }
 
 

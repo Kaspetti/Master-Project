@@ -99,3 +99,23 @@ func getLines(ensId int64, date int64) ([]Line, error) {
 
 	return lines, nil
 }
+
+func (l Line) GetLatitudes() []float64 {
+	lats := make([]float64, len(l.Coords))
+
+	for i, c := range l.Coords {
+		lats[i] = c.Latitude
+	}
+
+	return lats
+}
+
+func (l Line) GetLongitudes() []float64 {
+	lons := make([]float64, len(l.Coords))
+
+	for i, c := range l.Coords {
+		lons[i] = c.Longitude
+	}
+
+	return lons
+}
