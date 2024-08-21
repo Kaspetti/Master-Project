@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+
+    <link rel="stylesheet" href='/static/css/index.css'>
+  </head>
+
+  <body>
+    <label for="date-slider">Date: </label>
+    <input type="range" min="0" max="240" step="3" value="0" id="date-slider" name="date-slider" oninput="onSliderChange()" style="width:80vw">
+    <label for="date-slider" id="date-slider-label">0</label>
+    <button id="play-button" onclick="playButtonPressed()">Play</button>
+    <div id="map" style="height: 100vh">
+    </div>
+
+    <script src='/static/js/index.js'></script>
+  </body>
+</html>
