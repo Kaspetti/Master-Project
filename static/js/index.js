@@ -195,6 +195,8 @@ async function init() {
   }
   fetchAllData()
 
+  console.log(cachedLines)
+
   await showLines(0)
 }
 

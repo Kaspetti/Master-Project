@@ -4,39 +4,6 @@ import dask
 import numpy as np
 
 
-def get_coords(ens_id, line_id, time):
-    rootgrp = Dataset(
-        f"./2024070112/ec.ens_{ens_id:02d}.2024070112.sfc.mta.nc",
-        "r"
-    )
-
-    line_id_indices = rootgrp["line_id"][:] == line_id
-    time_indices = rootgrp["date"][:] == time
-    matched_indices = line_id_indices & time_indices
-
-    latitudes = rootgrp["latitude"][matched_indices]
-    longitudes = rootgrp["longitude"][matched_indices]
-
-    coords = [{"latitude": float(lat), "longitude": float(lon)}
-              for lat, lon in zip(latitudes, longitudes)]
-
-    rootgrp.close()
-
-    return coords
-
-
-def get_line_amount(ens_id, time):
-    rootgrp = Dataset(
-        f"./2024070112/ec.ens_{ens_id:02d}.2024070112.sfc.mta.nc",
-        "r"
-    )
-
-    line_count = len(set(rootgrp["line_id"][:]))
-    rootgrp.close()
-
-    return line_count
-
-
 def get_all_lines(time):
     all_lines = []
 
@@ -59,14 +26,18 @@ def get_all_lines(time):
 
         latitudes = rootgrp["latitude"][start:end]
         longitudes = rootgrp["longitude"][start:end]
+        ids = rootgrp["line_id"][start:end]
 
-        # time_indices = rootgrp["date"][:] == time
-        #
-        # latitudes = rootgrp["latitude"][time_indices]
-        # longitudes = rootgrp["longitude"][time_indices]
+        line = {"id": 1, "coords": []}
+        for id, lat, lon in zip(ids, latitudes, longitudes):
+            if line["id"] != id:
+                all_lines.append(line)
+                line = {"id": int(id), "coords": []}
 
-        all_lines.append([{"latitude": float(lat), "longitude": float(lon)}
-                          for lat, lon in zip(latitudes, longitudes)])
+            line["coords"].append({"latitude": float(lat), "longitude": float(lon)})
+
+        # all_lines.append([{"id": int(id), "coords": {"latitude": float(lat), "longitude": float(lon)}}
+        #                   for lat, lon, id in zip(latitudes, longitudes, ids)])
 
         rootgrp.close()
 
@@ -80,5 +51,3 @@ def get_all_lines_1(time):
 
     # latitudes = ds.latitude.sel(time=time).compute()
     # longitudes = ds.longitude.sel(time=time).compute()
-
-
