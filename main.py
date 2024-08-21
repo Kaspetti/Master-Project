@@ -1,6 +1,5 @@
 from data import get_all_lines_1
 import folium
-import random
 from matplotlib import colormaps as cm
 from matplotlib.colors import rgb2hex
 

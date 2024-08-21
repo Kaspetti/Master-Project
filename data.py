@@ -95,3 +95,7 @@ def dateline_fix(line):
             line["coords"][i] = (coord[0], coord[1] + 360)
 
     return line
+
+
+def lines_to_geojson(lines):
+    pass
