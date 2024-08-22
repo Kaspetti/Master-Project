@@ -2,8 +2,24 @@
 
 const dateSlider = document.getElementById("date-slider")
 const dateSliderLabel = document.getElementById("date-slider-label")
+const datePicker = document.getElementById("date-picker")
+
+const today = new Date();
+const yesterday = new Date(today);
+yesterday.setDate(today.getDate() - 1);
+let currentDate = yesterday.toJSON().slice(0, 10);
+datePicker.value = currentDate
 
 const playButton = document.getElementById("play-button")
+
+datePicker.oninput = async function(e) {
+  currentDate = datePicker.value
+  cachedLines = {}
+
+  fetchAllData(currentDate)
+
+  await showLines(0)
+}
 
 let updating = false
 let updatingValue = 0
@@ -177,41 +193,23 @@ async function init() {
   lineLayer = L.layerGroup().addTo(map)
   aggregateLayer = L.layerGroup().addTo(map)
 
-  // Fetches all data asynchronously and caches it
-  async function fetchAllData() {
-    let date = 0
-    while (date <= 240) {
-      if (!cachedLines[date]) {
-        let ls = await d3.json(`/api/all-lines?date=${date}`)
-        cachedLines[date] = ls
-      }
-
-      if (date < 72) {
-        date += 3
-      } else {
-        date += 6
-      }
-    }
-  }
-  fetchAllData()
-
-  console.log(cachedLines)
+  fetchAllData(currentDate)
 
   await showLines(0)
 }
 
 
 let boxSelectHandler
-async function showLines(date) {
+async function showLines(time) {
   const color = d3.scaleOrdinal(d3.schemeCategory10)
 
   let lines = []
   let selection = []
 
-  let ls = cachedLines[date]
+  let ls = cachedLines[time]
   if (!ls) {
-    ls = await d3.json(`/api/all-lines?date=${date}`)
-    cachedLines[date] = ls
+    ls = await d3.json(`/api/all-lines?date=${currentDate}&time=${time}`)
+    cachedLines[time] = ls
   }
 
   lineLayer.clearLayers()
@@ -339,6 +337,28 @@ function interpolateLine(line, X) {
   })
 
   L.polyline(interpolatedLine, { color: "green", weight: 1 }).addTo(aggregateLayer)
+}
+
+// Fetches all data asynchronously and caches it
+async function fetchAllData(currentDate) {
+  const exists = await fetch(`/api/data-exists?date=${currentDate}`)
+  if (!exists.ok) {
+    console.log(`Downloading data for ${currentDate}`)
+  }
+
+  let time = 0
+  while (time <= 240) {
+    if (!cachedLines[time]) {
+      let ls = await d3.json(`/api/all-lines?date=${currentDate}&time=${time}`)
+      cachedLines[time] = ls
+    }
+
+    if (time < 72) {
+      time += 3
+    } else {
+      time += 6
+    }
+  }
 }
 
 

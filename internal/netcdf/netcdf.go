@@ -20,10 +20,10 @@ type Coord struct {
 
 // GetAllLines gets all lines of a given date from all ensemble members.
 // Dates range from 0-240 and is hours since simulation start.
-func GetAllLines(date int64) ([]Line, error) {
+func GetAllLines(dataFolder string, time int64) ([]Line, error) {
 	allLines := make([]Line, 0)
 	for i := 0; i < 50; i++ {
-		lines, err := getLines(int64(i), date)
+		lines, err := getLines(dataFolder, int64(i), time)
 		if err != nil {
 			return nil, err
 		}
@@ -34,9 +34,9 @@ func GetAllLines(date int64) ([]Line, error) {
 	return allLines, nil
 }
 
-func getLines(ensId int64, date int64) ([]Line, error) {
+func getLines(dataFolder string, ensId int64, time int64) ([]Line, error) {
 	// Opens the netCDF file of the ensamble member of id 'ensId'
-	nc, err := netcdf.Open(fmt.Sprintf("./2024070112/ec.ens_%02d.2024070112.sfc.mta.nc", ensId))
+	nc, err := netcdf.Open(fmt.Sprintf("./%s/ec.ens_%02d.%s.sfc.mta.nc", dataFolder, ensId, dataFolder))
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func getLines(ensId int64, date int64) ([]Line, error) {
 
 	lines := make([]Line, 0)
 	for i := 0; i < len(ids); i++ {
-		if dates[i] == date {
+		if dates[i] == time {
 			id := ids[i]
 			if int64(len(lines)) < id {
 				lines = append(lines,
@@ -92,7 +92,7 @@ func getLines(ensId int64, date int64) ([]Line, error) {
 			}
 
 			lines[id-1].Coords = append(lines[id-1].Coords, Coord{lats[i], lons[i]})
-		} else if dates[i] > date {
+		} else if dates[i] > time {
 			break
 		}
 	}
