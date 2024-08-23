@@ -54,13 +54,25 @@ def dateline_fix(coords):
     return coords
 
 
+def get_enclosing_triangle(line_point, ico_points):
+    dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
+    sort_indices = np.argsort(dist_sqrd)
+
+    return sort_indices[:3]
+
+
 if __name__ == "__main__":
     # generate icosphere
-    nu = 8
+    nu = 4
     vertices, faces = icosphere(nu)
+
+    ico_lat_lons = []
+    for v in vertices:
+        ico_lat_lons.append(to_lat_lon(v))
 
     # read data
     lines = get_all_lines()
+    print(get_enclosing_triangle(lines[0]["coords"][0], ico_lat_lons))
 
     # show map
     attr = (
@@ -87,9 +99,8 @@ if __name__ == "__main__":
         ).add_to(m)
 
     # show the vertices of the icosphere on the map
-    circle_radius = 5
-    for v in vertices:
-        lat_lon = to_lat_lon(v)
+    circle_radius = 2
+    for lat_lon in ico_lat_lons:
         folium.CircleMarker(
             location=lat_lon,
             radius=circle_radius,
@@ -98,6 +109,5 @@ if __name__ == "__main__":
             fill_opacity=1,
             fill=True,
         ).add_to(m)
-
 
     m.save("index.html")
