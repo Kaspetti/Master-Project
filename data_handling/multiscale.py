@@ -115,20 +115,25 @@ def get_enclosing_triangle(line_point, ico_points):
     return sort_indices[:3]
 
 
-def subdivide_triangle(points):
+def subdivide_triangle(ps):
     '''
     Subdivides a triangle once creating three new points, one
     on the midpoint on all three sides of the triangle
 
     Parameters
     ----------
-    points : the points making up the triangle
+    ps : the points making up the triangle
 
     Returns
     -------
-    new_points : 3 new points which subdivides the original triangle
+    [p_1, p_2, p_3] : 3 new points which subdivides the original triangle
     '''
-    pass
+
+    p_1 = [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2]
+    p_2 = [(ps[0][0] + ps[2][0]) / 2, (ps[0][1] + ps[2][1]) / 2]
+    p_3 = [(ps[1][0] + ps[2][0]) / 2, (ps[1][1] + ps[2][1]) / 2]
+
+    return [p_1, p_2, p_3]
 
 
 if __name__ == "__main__":
@@ -183,25 +188,24 @@ if __name__ == "__main__":
     # enclosing triangle test
     line_id = 5
 
-    for coord in lines[line_id]["coords"]:
-        enc_tri = get_enclosing_triangle(coord, ico_lat_lons)
-        for tri in enc_tri:
-            folium.CircleMarker(
-                location=ico_lat_lons[tri],
-                color="black",
-                weight=0,
-                fill_opacity=1,
-                fill=True,
-                radius=5,
-            ).add_to(m)
-
+    enc_tri = get_enclosing_triangle(lines[line_id]["coords"][0], ico_lat_lons)
+    for tri in enc_tri:
         folium.CircleMarker(
-            location=coord,
-            color="green",
+            location=ico_lat_lons[tri],
+            color="black",
             weight=0,
             fill_opacity=1,
             fill=True,
             radius=5,
         ).add_to(m)
+
+    folium.CircleMarker(
+        location=lines[line_id]["coords"][0],
+        color="green",
+        weight=0,
+        fill_opacity=1,
+        fill=True,
+        radius=5,
+    ).add_to(m)
 
     m.save("index.html")
