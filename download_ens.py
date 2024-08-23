@@ -6,7 +6,7 @@ def filename(x, d):
     return f"ec.ens_{x}.{d}.sfc.mta.nc"
 
 
-date = "2024070112"
+date = "2024082300"
 
 if not os.path.exists(f"./{date}"):
     os.mkdir(f"./{date}")
