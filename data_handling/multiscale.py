@@ -24,6 +24,28 @@ def to_lat_lon(v):
     return [lat, lon]
 
 
+def to_xyz(v):
+    '''
+    Converts a [lat, lon] coordinate into 3D coordinates ([x, y ,z]) on the
+    unit sphere
+
+    Parameters
+    ----------
+    v : the [lat, lon] coordinate to convert
+
+    Returns
+    -------
+    [x, y, z] : the coordinate represented as [x, y, z] coordinates
+    on the unit sphere
+    '''
+
+    x = math.cos(math.radians(v[0])) * math.cos(math.radians(v[1]))
+    y = math.cos(math.radians(v[0])) * math.sin(math.radians(v[1]))
+    z = math.sin(math.radians(v[0]))
+
+    return [x, y, z]
+
+
 def get_all_lines(start, time_offset):
     '''
     Gets all the lines from a NetCDF file given the start date and time offset
@@ -101,8 +123,8 @@ def get_enclosing_triangle(line_point, ico_points):
 
     Parameters
     ----------
-    line_point : the point to get the enclosing triangle of ([lat, lon])
-    ico_points : all the vertices of the ico sphere ([[lat, lon]...])
+    line_point : the point to get the enclosing triangle of ([x, y, z])
+    ico_points : all the vertices of the ico sphere ([[x, y, z]...])
 
     Returns
     -------
@@ -129,9 +151,9 @@ def subdivide_triangle(ps):
     [p_1, p_2, p_3] : 3 new points which subdivides the original triangle
     '''
 
-    p_1 = [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2]
-    p_2 = [(ps[0][0] + ps[2][0]) / 2, (ps[0][1] + ps[2][1]) / 2]
-    p_3 = [(ps[1][0] + ps[2][0]) / 2, (ps[1][1] + ps[2][1]) / 2]
+    p_1 = [(ps[0][0] + ps[1][0]) / 2, (ps[0][1] + ps[1][1]) / 2, (ps[0][2] + ps[1][2]) / 2]
+    p_2 = [(ps[0][0] + ps[2][0]) / 2, (ps[0][1] + ps[2][1]) / 2, (ps[0][2] + ps[2][2]) / 2]
+    p_3 = [(ps[1][0] + ps[2][0]) / 2, (ps[1][1] + ps[2][1]) / 2, (ps[1][2] + ps[2][2]) / 2]
 
     return [p_1, p_2, p_3]
 
@@ -139,15 +161,14 @@ def subdivide_triangle(ps):
 if __name__ == "__main__":
     # generate icosphere
     nu = 4
-    vertices, faces = icosphere(nu)
+    ico_vertices, faces = icosphere(nu)
 
-    ico_lat_lons = []
-    for v in vertices:
-        ico_lat_lons.append(to_lat_lon(v))
+    # ico_lat_lons = []
+    # for v in vertices:
+    #     ico_lat_lons.append(to_lat_lon(v))
 
     # read data
     lines = get_all_lines("2024082300", 0)
-    # print(get_enclosing_triangle(lines[0]["coords"][0], ico_lat_lons))
 
     # show map
     attr = (
@@ -175,29 +196,59 @@ if __name__ == "__main__":
 
     # show the vertices of the icosphere on the map
     circle_radius = 2
-    for lat_lon in ico_lat_lons:
+    for i, v in enumerate(ico_vertices):
         folium.CircleMarker(
-            location=lat_lon,
+            location=to_lat_lon(v),
             radius=circle_radius,
             color="blue",
             weight=0,
             fill_opacity=1,
             fill=True,
+            tooltip=i,
         ).add_to(m)
 
     # enclosing triangle test
     line_id = 5
+    point_nr = 0
+    level = 10
 
-    enc_tri = get_enclosing_triangle(lines[line_id]["coords"][0], ico_lat_lons)
-    for tri in enc_tri:
-        folium.CircleMarker(
-            location=ico_lat_lons[tri],
-            color="black",
-            weight=0,
-            fill_opacity=1,
-            fill=True,
-            radius=5,
-        ).add_to(m)
+    point = lines[line_id]["coords"][point_nr]
+    for i in range(level):
+        enc_tri = get_enclosing_triangle(to_xyz(point), ico_vertices)
+
+        subdiv_tri = subdivide_triangle(ico_vertices[enc_tri.astype(int)])
+        ico_vertices = np.vstack((ico_vertices, subdiv_tri))
+
+        for tri in subdiv_tri:
+            folium.CircleMarker(
+                location=to_lat_lon(tri),
+                color="blue",
+                weight=0,
+                fill_opacity=1,
+                fill=True,
+                radius=2,
+            ).add_to(m)
+
+        if i == level-1:
+            for tri in enc_tri:
+                folium.CircleMarker(
+                    location=to_lat_lon(ico_vertices[tri]),
+                    color="red",
+                    weight=0,
+                    fill_opacity=1,
+                    fill=True,
+                    radius=3,
+                ).add_to(m)
+
+            for tri in subdiv_tri:
+                folium.CircleMarker(
+                    location=to_lat_lon(tri),
+                    color="black",
+                    weight=0,
+                    fill_opacity=1,
+                    fill=True,
+                    radius=8,
+                ).add_to(m)
 
     folium.CircleMarker(
         location=lines[line_id]["coords"][0],
