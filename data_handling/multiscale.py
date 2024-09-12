@@ -167,10 +167,6 @@ if __name__ == "__main__":
     nu = 4
     ico_vertices, faces = icosphere(nu)
 
-    # ico_lat_lons = []
-    # for v in vertices:
-    #     ico_lat_lons.append(to_lat_lon(v))
-
     # read data
     lines = get_all_lines("2024082300", 0)
 
@@ -211,39 +207,76 @@ if __name__ == "__main__":
         ).add_to(m)
 
     line_id = 5
-    point_nr = 0
-    level = 10
+    level = 2
 
     line_points = lines[line_id]["coords"]
     line_points_3d = [to_xyz(coord) for coord in lines[line_id]["coords"]]
 
-    point_lat_lon = line_points[point_nr]
-    point_3d = line_points_3d[point_nr]
+    for i in range(27, 28):
+        point_lat_lon = line_points[i]
+        point_3d = line_points_3d[i]
 
-    folium.CircleMarker(
-        location=point_lat_lon,
-        color="green",
-        weight=0,
-        fill_opacity=1,
-        fill=True,
-        radius=5,
-    ).add_to(m)
+        folium.CircleMarker(
+            location=point_lat_lon,
+            color="green",
+            weight=0,
+            fill_opacity=1,
+            fill=True,
+            tooltip=i,
+            radius=5,
+        ).add_to(m)
 
-    local_ico_points = ico_vertices
-    for i in range(level):
-        tri_pts_3d = get_enclosing_triangle(point_3d, local_ico_points)
-        subdiv_pts = subdivide_triangle(tri_pts_3d)
+        local_ico_points = ico_vertices
+        for i in range(level):
+            tri_pts_3d = get_enclosing_triangle(point_3d, local_ico_points)
+            subdiv_pts = subdivide_triangle(tri_pts_3d)
 
-        for pt in subdiv_pts:
-            folium.CircleMarker(
-                location=to_lat_lon(pt),
-                color="blue",
-                weight=0,
-                fill_opacity=1,
-                fill=True,
-                radius=2,
-            ).add_to(m)
+            for pt in subdiv_pts:
+                folium.CircleMarker(
+                    location=to_lat_lon(pt),
+                    color="blue",
+                    weight=0,
+                    fill_opacity=1,
+                    fill=True,
+                    radius=2,
+                ).add_to(m)
 
-        local_ico_points = np.vstack((tri_pts_3d, subdiv_pts))
+            if i == level - 1:
+                for pt in local_ico_points:
+                    print(np.linalg.norm(pt))
+                    folium.CircleMarker(
+                        location=to_lat_lon(pt),
+                        color="black",
+                        weight=0,
+                        fill_opacity=1,
+                        fill=True,
+                        radius=5,
+                    ).add_to(m)
+
+                for pt in subdiv_pts:
+                    folium.CircleMarker(
+                        location=to_lat_lon(pt),
+                        color="red",
+                        weight=0,
+                        fill_opacity=1,
+                        fill=True,
+                        radius=3,
+                    ).add_to(m)
+
+                for pt in tri_pts_3d:
+                    folium.CircleMarker(
+                        location=to_lat_lon(pt),
+                        color="orange",
+                        weight=0,
+                        fill_opacity=1,
+                        fill=True,
+                        radius=3,
+                    ).add_to(m)
+
+
+
+
+
+            local_ico_points = np.vstack((tri_pts_3d, subdiv_pts))
 
     m.save("index.html")
