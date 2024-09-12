@@ -134,7 +134,7 @@ def get_enclosing_triangle(line_point, ico_points):
     dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
     sort_indices = np.argsort(dist_sqrd)
 
-    return sort_indices[:3]
+    return ico_points[sort_indices[:3]]
 
 
 def subdivide_triangle(ps):
@@ -155,7 +155,11 @@ def subdivide_triangle(ps):
     p_2 = [(ps[0][0] + ps[2][0]) / 2, (ps[0][1] + ps[2][1]) / 2, (ps[0][2] + ps[2][2]) / 2]
     p_3 = [(ps[1][0] + ps[2][0]) / 2, (ps[1][1] + ps[2][1]) / 2, (ps[1][2] + ps[2][2]) / 2]
 
-    return [p_1, p_2, p_3]
+    return [normalize_point(p_1), normalize_point(p_2), normalize_point(p_3)]
+
+
+def normalize_point(p):
+    return p / np.linalg.norm(p)
 
 
 if __name__ == "__main__":
@@ -190,16 +194,15 @@ if __name__ == "__main__":
         folium.PolyLine(
             locations=line["coords"],
             weight=1,
-            color="red",
+            color="#9999",
             tooltip=line["id"],
         ).add_to(m)
 
     # show the vertices of the icosphere on the map
-    circle_radius = 2
     for i, v in enumerate(ico_vertices):
         folium.CircleMarker(
             location=to_lat_lon(v),
-            radius=circle_radius,
+            radius=2,
             color="blue",
             weight=0,
             fill_opacity=1,
@@ -207,21 +210,33 @@ if __name__ == "__main__":
             tooltip=i,
         ).add_to(m)
 
-    # enclosing triangle test
     line_id = 5
     point_nr = 0
     level = 10
 
-    point = lines[line_id]["coords"][point_nr]
+    line_points = lines[line_id]["coords"]
+    line_points_3d = [to_xyz(coord) for coord in lines[line_id]["coords"]]
+
+    point_lat_lon = line_points[point_nr]
+    point_3d = line_points_3d[point_nr]
+
+    folium.CircleMarker(
+        location=point_lat_lon,
+        color="green",
+        weight=0,
+        fill_opacity=1,
+        fill=True,
+        radius=5,
+    ).add_to(m)
+
+    local_ico_points = ico_vertices
     for i in range(level):
-        enc_tri = get_enclosing_triangle(to_xyz(point), ico_vertices)
+        tri_pts_3d = get_enclosing_triangle(point_3d, local_ico_points)
+        subdiv_pts = subdivide_triangle(tri_pts_3d)
 
-        subdiv_tri = subdivide_triangle(ico_vertices[enc_tri.astype(int)])
-        ico_vertices = np.vstack((ico_vertices, subdiv_tri))
-
-        for tri in subdiv_tri:
+        for pt in subdiv_pts:
             folium.CircleMarker(
-                location=to_lat_lon(tri),
+                location=to_lat_lon(pt),
                 color="blue",
                 weight=0,
                 fill_opacity=1,
@@ -229,34 +244,6 @@ if __name__ == "__main__":
                 radius=2,
             ).add_to(m)
 
-        if i == level-1:
-            for tri in enc_tri:
-                folium.CircleMarker(
-                    location=to_lat_lon(ico_vertices[tri]),
-                    color="red",
-                    weight=0,
-                    fill_opacity=1,
-                    fill=True,
-                    radius=3,
-                ).add_to(m)
-
-            for tri in subdiv_tri:
-                folium.CircleMarker(
-                    location=to_lat_lon(tri),
-                    color="black",
-                    weight=0,
-                    fill_opacity=1,
-                    fill=True,
-                    radius=8,
-                ).add_to(m)
-
-    folium.CircleMarker(
-        location=lines[line_id]["coords"][0],
-        color="green",
-        weight=0,
-        fill_opacity=1,
-        fill=True,
-        radius=5,
-    ).add_to(m)
+        local_ico_points = np.vstack((tri_pts_3d, subdiv_pts))
 
     m.save("index.html")
