@@ -207,12 +207,13 @@ if __name__ == "__main__":
         ).add_to(m)
 
     line_id = 5
-    level = 2
+    level = 5
 
     line_points = lines[line_id]["coords"]
     line_points_3d = [to_xyz(coord) for coord in lines[line_id]["coords"]]
 
-    for i in range(27, 28):
+    # for i in range(27, 28):
+    for i in range(len(line_points)):
         point_lat_lon = line_points[i]
         point_3d = line_points_3d[i]
 
@@ -241,37 +242,37 @@ if __name__ == "__main__":
                     radius=2,
                 ).add_to(m)
 
-            if i == level - 1:
-                for pt in local_ico_points:
-                    print(np.linalg.norm(pt))
-                    folium.CircleMarker(
-                        location=to_lat_lon(pt),
-                        color="black",
-                        weight=0,
-                        fill_opacity=1,
-                        fill=True,
-                        radius=5,
-                    ).add_to(m)
-
-                for pt in subdiv_pts:
-                    folium.CircleMarker(
-                        location=to_lat_lon(pt),
-                        color="red",
-                        weight=0,
-                        fill_opacity=1,
-                        fill=True,
-                        radius=3,
-                    ).add_to(m)
-
-                for pt in tri_pts_3d:
-                    folium.CircleMarker(
-                        location=to_lat_lon(pt),
-                        color="orange",
-                        weight=0,
-                        fill_opacity=1,
-                        fill=True,
-                        radius=3,
-                    ).add_to(m)
+            # if i == level - 1:
+            #     for pt in local_ico_points:
+            #         print(np.linalg.norm(pt))
+            #         folium.CircleMarker(
+            #             location=to_lat_lon(pt),
+            #             color="black",
+            #             weight=0,
+            #             fill_opacity=1,
+            #             fill=True,
+            #             radius=5,
+            #         ).add_to(m)
+            #
+            #     for pt in subdiv_pts:
+            #         folium.CircleMarker(
+            #             location=to_lat_lon(pt),
+            #             color="red",
+            #             weight=0,
+            #             fill_opacity=1,
+            #             fill=True,
+            #             radius=3,
+            #         ).add_to(m)
+            #
+            #     for pt in tri_pts_3d:
+            #         folium.CircleMarker(
+            #             location=to_lat_lon(pt),
+            #             color="orange",
+            #             weight=0,
+            #             fill_opacity=1,
+            #             fill=True,
+            #             radius=3,
+            #         ).add_to(m)
 
 
 
