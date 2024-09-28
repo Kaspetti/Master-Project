@@ -1,8 +1,13 @@
 from icosphere import icosphere
-import folium
 import math
 import xarray as xr
 import numpy as np
+import geoplot as gplt
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import LineString
+import matplotlib.pyplot as plt
+import contextily as cx
 
 
 def to_lat_lon(v):
@@ -88,7 +93,7 @@ def get_all_lines(start, time_offset):
             if max_lon - min_lon > 180:
                 coords = dateline_fix(coords)
 
-            all_lines.append({"id": id, "coords": coords})
+            all_lines.append({"id": f"{i}|{int(id)}", "coords": coords})
 
     return all_lines
 
@@ -170,114 +175,134 @@ if __name__ == "__main__":
     # read data
     lines = get_all_lines("2024082300", 0)
 
+    ids = [line["id"] for line in lines]
+    df = pd.DataFrame(ids, columns=["id"])
+    geometry = [LineString(np.flip(line["coords"])) for line in lines]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+
+    ax = gdf.plot(figsize=(10, 10))
+    # cx.add_basemap(ax, crs="EPSG:4326")
+
+    ax.set_xlim(-180, 180)
+    ax.set_ylim(-90, 90)
+
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.title('2024082300 +0h all 50 members')
+
+    plt.show()
+
+
+    # plt.savefig("plot.png")
+
     # show map
-    attr = (
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
-        'contributors, &copy; <a href="https://cartodb.com/attributions">CartoDB</a>'
-    )
-    tiles = "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
-
-    lat = 0
-    lon = 0
-    zoom_start = 2
-    m = folium.Map(location=[lat, lon],
-                   tiles=tiles,
-                   attr=attr,
-                   zoom_start=zoom_start)
-
-    # show the lines
-    for line in lines:
-        folium.PolyLine(
-            locations=line["coords"],
-            weight=1,
-            color="#9999",
-            tooltip=line["id"],
-        ).add_to(m)
-
-    # show the vertices of the icosphere on the map
-    for i, v in enumerate(ico_vertices):
-        folium.CircleMarker(
-            location=to_lat_lon(v),
-            radius=2,
-            color="blue",
-            weight=0,
-            fill_opacity=1,
-            fill=True,
-            tooltip=i,
-        ).add_to(m)
-
-    line_id = 5
-    level = 5
-
-    line_points = lines[line_id]["coords"]
-    line_points_3d = [to_xyz(coord) for coord in lines[line_id]["coords"]]
-
-    # for i in range(27, 28):
-    for i in range(len(line_points)):
-        point_lat_lon = line_points[i]
-        point_3d = line_points_3d[i]
-
-        folium.CircleMarker(
-            location=point_lat_lon,
-            color="green",
-            weight=0,
-            fill_opacity=1,
-            fill=True,
-            tooltip=i,
-            radius=5,
-        ).add_to(m)
-
-        local_ico_points = ico_vertices
-        for i in range(level):
-            tri_pts_3d = get_enclosing_triangle(point_3d, local_ico_points)
-            subdiv_pts = subdivide_triangle(tri_pts_3d)
-
-            for pt in subdiv_pts:
-                folium.CircleMarker(
-                    location=to_lat_lon(pt),
-                    color="blue",
-                    weight=0,
-                    fill_opacity=1,
-                    fill=True,
-                    radius=2,
-                ).add_to(m)
-
-            # if i == level - 1:
-            #     for pt in local_ico_points:
-            #         print(np.linalg.norm(pt))
-            #         folium.CircleMarker(
-            #             location=to_lat_lon(pt),
-            #             color="black",
-            #             weight=0,
-            #             fill_opacity=1,
-            #             fill=True,
-            #             radius=5,
-            #         ).add_to(m)
-            #
-            #     for pt in subdiv_pts:
-            #         folium.CircleMarker(
-            #             location=to_lat_lon(pt),
-            #             color="red",
-            #             weight=0,
-            #             fill_opacity=1,
-            #             fill=True,
-            #             radius=3,
-            #         ).add_to(m)
-            #
-            #     for pt in tri_pts_3d:
-            #         folium.CircleMarker(
-            #             location=to_lat_lon(pt),
-            #             color="orange",
-            #             weight=0,
-            #             fill_opacity=1,
-            #             fill=True,
-            #             radius=3,
-            #         ).add_to(m)
-
-
-
-
-
-            local_ico_points = np.vstack((tri_pts_3d, subdiv_pts))
-
-    m.save("index.html")
+    # attr = (
+    #     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> '
+    #     'contributors, &copy; <a href="https://cartodb.com/attributions">CartoDB</a>'
+    # )
+    # tiles = "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png"
+    #
+    # lat = 0
+    # lon = 0
+    # zoom_start = 2
+    # m = folium.Map(location=[lat, lon],
+    #                tiles=tiles,
+    #                attr=attr,
+    #                zoom_start=zoom_start)
+    #
+    # # show the lines
+    # for line in lines:
+    #     folium.PolyLine(
+    #         locations=line["coords"],
+    #         weight=1,
+    #         color="#9999",
+    #         tooltip=line["id"],
+    #     ).add_to(m)
+    #
+    # # show the vertices of the icosphere on the map
+    # for i, v in enumerate(ico_vertices):
+    #     folium.CircleMarker(
+    #         location=to_lat_lon(v),
+    #         radius=2,
+    #         color="blue",
+    #         weight=0,
+    #         fill_opacity=1,
+    #         fill=True,
+    #         tooltip=i,
+    #     ).add_to(m)
+    #
+    # line_id = 5
+    # level = 5
+    #
+    # line_points = lines[line_id]["coords"]
+    # line_points_3d = [to_xyz(coord) for coord in lines[line_id]["coords"]]
+    #
+    # # for i in range(27, 28):
+    # for i in range(len(line_points)):
+    #     point_lat_lon = line_points[i]
+    #     point_3d = line_points_3d[i]
+    #
+    #     folium.CircleMarker(
+    #         location=point_lat_lon,
+    #         color="green",
+    #         weight=0,
+    #         fill_opacity=1,
+    #         fill=True,
+    #         tooltip=i,
+    #         radius=5,
+    #     ).add_to(m)
+    #
+    #     local_ico_points = ico_vertices
+    #     for i in range(level):
+    #         tri_pts_3d = get_enclosing_triangle(point_3d, local_ico_points)
+    #         subdiv_pts = subdivide_triangle(tri_pts_3d)
+    #
+    #         for pt in subdiv_pts:
+    #             folium.CircleMarker(
+    #                 location=to_lat_lon(pt),
+    #                 color="blue",
+    #                 weight=0,
+    #                 fill_opacity=1,
+    #                 fill=True,
+    #                 radius=2,
+    #             ).add_to(m)
+    #
+    #         # if i == level - 1:
+    #         #     for pt in local_ico_points:
+    #         #         print(np.linalg.norm(pt))
+    #         #         folium.CircleMarker(
+    #         #             location=to_lat_lon(pt),
+    #         #             color="black",
+    #         #             weight=0,
+    #         #             fill_opacity=1,
+    #         #             fill=True,
+    #         #             radius=5,
+    #         #         ).add_to(m)
+    #         #
+    #         #     for pt in subdiv_pts:
+    #         #         folium.CircleMarker(
+    #         #             location=to_lat_lon(pt),
+    #         #             color="red",
+    #         #             weight=0,
+    #         #             fill_opacity=1,
+    #         #             fill=True,
+    #         #             radius=3,
+    #         #         ).add_to(m)
+    #         #
+    #         #     for pt in tri_pts_3d:
+    #         #         folium.CircleMarker(
+    #         #             location=to_lat_lon(pt),
+    #         #             color="orange",
+    #         #             weight=0,
+    #         #             fill_opacity=1,
+    #         #             fill=True,
+    #         #             radius=3,
+    #         #         ).add_to(m)
+    #
+    #
+    #
+    #
+    #
+    #         local_ico_points = np.vstack((tri_pts_3d, subdiv_pts))
+    #
+    # m.save("index.html")
