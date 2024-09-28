@@ -4,7 +4,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 import geopandas as gpd
-from shapely.geometry import LineString
+from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
@@ -182,6 +182,8 @@ def generate_plot(simstart, time_offset, show=False):
         shown and not saved
     """
 
+    # generate icosphere
+
     lines = get_all_lines(simstart, time_offset)
 
     ids = [line["id"] for line in lines]
@@ -197,7 +199,15 @@ def generate_plot(simstart, time_offset, show=False):
     ax.add_feature(cfeature.COASTLINE, edgecolor="black")
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
 
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree())
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1)
+
+    nu = 4
+    ico_vertices, faces = icosphere(nu)
+    ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
+    geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
+
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
     ax.set_global()
     ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
@@ -231,10 +241,6 @@ def generate_all_plots(simstart):
 
 
 if __name__ == "__main__":
-    # generate icosphere
-    nu = 4
-    ico_vertices, faces = icosphere(nu)
-
     generate_plot("2024082300", 0, show=True)
 
     # generate_all_plots("2024082300")
