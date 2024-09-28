@@ -167,38 +167,74 @@ def normalize_point(p):
     return p / np.linalg.norm(p)
 
 
-if __name__ == "__main__":
-    # generate icosphere
-    nu = 4
-    ico_vertices, faces = icosphere(nu)
+def generate_plot(simstart, time_offset, show=False):
+    """
+    Generates a plot of the lines from a given simulation start and a time offset.
+    The plot will be saved as a svg file with this naming convention:
+        <simstart>_<time_offset>h.svg
 
+    Parameters
+    ----------
+    simstart : the simulation start. Must be already downloaded.
+        Format: YYYYDDMMHH
+    time_offset : the time offset from the simulation start. In hours
+    show : if show is set to "True" then the plot will only be
+        shown and not saved
+    """
+
+    lines = get_all_lines(simstart, time_offset)
+
+    ids = [line["id"] for line in lines]
+    df = pd.DataFrame(ids, columns=["id"])
+    geometry = [LineString(np.flip(line["coords"])) for line in lines]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")
+    ax.add_feature(cfeature.COASTLINE, edgecolor="black")
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
+
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree())
+
+    ax.set_global()
+    ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
+
+    if show:
+        plt.show()
+    else:
+        plt.savefig(f"./images/{simstart}_{time_offset}h.svg", transparent=True, format="svg")
+    plt.close()
+
+
+def generate_all_plots(simstart):
+    """
+    Generates and saves the plots for each time offset for the given simstart
+
+    Parameters
+    ----------
+    simstart : the simulation start. Must be already downloaded.
+        Format: YYYYDDMMHH
+    """
     i = 0
     while (i <= 240):
-        print(f"Generating 2024082300_{i}h.svg")
-        lines = get_all_lines("2024082300", i)
+        print(f"Generating {simstart}_{i}h.svg")
 
-        ids = [line["id"] for line in lines]
-        df = pd.DataFrame(ids, columns=["id"])
-        geometry = [LineString(np.flip(line["coords"])) for line in lines]
-        gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
-
-        fig = plt.figure(figsize=(12, 8))
-        ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
-
-        ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")
-        ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")
-        ax.add_feature(cfeature.COASTLINE, edgecolor="black")
-        ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
-
-        gdf.plot(ax=ax, transform=ccrs.PlateCarree())
-
-        ax.set_global()
-        ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
-
-        plt.savefig(f"./images/2024082300_{i}h.svg", transparent=True, format="svg")
-        plt.close()
+        generate_plot(simstart, i)
 
         if i < 72:
             i += 3
         else:
             i += 6
+
+
+if __name__ == "__main__":
+    # generate icosphere
+    nu = 4
+    ico_vertices, faces = icosphere(nu)
+
+    generate_plot("2024082300", 0, show=True)
+
+    # generate_all_plots("2024082300")
