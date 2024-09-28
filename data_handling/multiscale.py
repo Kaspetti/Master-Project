@@ -182,8 +182,6 @@ def generate_plot(simstart, time_offset, show=False):
         shown and not saved
     """
 
-    # generate icosphere
-
     lines = get_all_lines(simstart, time_offset)
 
     ids = [line["id"] for line in lines]
@@ -199,8 +197,27 @@ def generate_plot(simstart, time_offset, show=False):
     ax.add_feature(cfeature.COASTLINE, edgecolor="black")
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
 
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1)
+    # gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1)
 
+    # START OF DEBUG #
+
+    # Visualize line 514 in red with a bolder line
+    colors = ["blue"] * len(gdf)
+    linewidth = [1] * len(gdf)
+
+    colors[514] = "red"
+    linewidth[514] = 2
+
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
+             linewidth=linewidth, colors=colors)
+
+    # Show points of line 514
+    geometry = [Point(np.flip(coord)) for coord in lines[514]["coords"]]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
+             color="green", markersize=100, zorder=100)
+
+    # Visualize the vertices of the icosphere
     nu = 4
     ico_vertices, faces = icosphere(nu)
     ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
@@ -209,7 +226,12 @@ def generate_plot(simstart, time_offset, show=False):
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
-    ax.set_global()
+    # Focus the view on line on index 514
+    ax.set_extent([-55, -10, 5, 40], crs=ccrs.PlateCarree())
+
+    # END OF DEBUG #
+
+    # ax.set_global()
     ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
 
     if show:
