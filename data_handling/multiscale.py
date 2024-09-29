@@ -73,7 +73,7 @@ def get_all_lines(start, time_offset):
 
     for i in range(50):
         ds = xr.open_dataset(
-                f"{start}/ec.ens_{i:02d}.{start}.sfc.mta.nc"
+                f"./data/{start}/ec.ens_{i:02d}.{start}.sfc.mta.nc"
             )
         date_ds = ds.where(
                     ds.date == start_time + np.timedelta64(time_offset, "h"),
