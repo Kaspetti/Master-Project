@@ -117,7 +117,6 @@ def dateline_fix(coords: List[float]) -> List[float]:
     it simply shifts them
 
     Parameters
-    ----------
     coords : List[float] of shape (n,) with n = amount of points
         The coordinates to shift. An array of lat/lon points
 
@@ -207,6 +206,27 @@ def normalize_point(p: List[List[float]]) -> List[List[float]]:
     """
 
     return p / np.linalg.norm(p)
+
+
+def haversine(c1: List[float], c2: List[float]) -> float:
+    """
+    Calculates the distance between two lat/lon points using the
+    haversine formula
+
+    Parameters
+    ----------
+    c1 : List[float] of shape (2,)
+        First coordinate
+    c2 : List[float] of shape (2,)
+        Second coordinate
+
+    Returns
+    -------
+    dist : float
+        The distance between c1 and c2
+    """
+
+    return -1
 
 
 def generate_plot(simstart: str, time_offset: int, show: bool = False):
