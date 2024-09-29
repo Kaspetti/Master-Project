@@ -226,7 +226,27 @@ def haversine(c1: List[float], c2: List[float]) -> float:
         The distance between c1 and c2
     """
 
-    return -1
+    # Don't bother calculating distance if coords are the same
+    if c1 == c2:
+        return 0.0
+
+    earth_radius = 6371
+
+    lat_1, lon_1 = math.radians(c1[0]), math.radians(c1[1])
+    lat_2, lon_2 = math.radians(c2[0]), math.radians(c2[1])
+
+    d_lat = lat_2 - lat_1
+    d_lon = lon_2 - lon_1
+
+    dist = 2 * earth_radius * math.asin(
+            math.sqrt(
+                (1 - math.cos(d_lat)
+                 + math.cos(lat_1)
+                 * math.cos(lat_2)
+                 * (1 - math.cos(d_lon)))
+                / 2))
+
+    return dist
 
 
 def generate_plot(simstart: str, time_offset: int, show: bool = False):
