@@ -238,13 +238,8 @@ def haversine(c1: List[float], c2: List[float]) -> float:
     d_lat = lat_2 - lat_1
     d_lon = lon_2 - lon_1
 
-    dist = 2 * earth_radius * math.asin(
-            math.sqrt(
-                (1 - math.cos(d_lat)
-                 + math.cos(lat_1)
-                 * math.cos(lat_2)
-                 * (1 - math.cos(d_lon)))
-                / 2))
+    a = 1 - math.cos(d_lat) + math.cos(lat_1) * math.cos(lat_2) * (1 - math.cos(d_lon))
+    dist = 2 * earth_radius * math.asin(math.sqrt(a / 2))
 
     return dist
 
