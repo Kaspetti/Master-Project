@@ -152,10 +152,16 @@ def get_enclosing_triangle(line_point: List[float],
         The coordinates of the 3 closest points on the icosphere to the
         line point. These 3 points form the triangle enclosing the point
     '''
-    dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
-    sort_indices = np.argsort(dist_sqrd)
 
-    return ico_points[sort_indices[:3]]
+    dists = [haversine(line_point, ico_point) for ico_point in ico_points]
+    sort_indices = np.argsort(dists)
+
+    return np.array(ico_points)[sort_indices[:3]]
+
+    # dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
+    # sort_indices = np.argsort(dist_sqrd)
+
+    # return ico_points[sort_indices[:3]]
 
 
 def subdivide_triangle(ps: List[List[float]]) -> List[List[float]]:
@@ -226,10 +232,6 @@ def haversine(c1: List[float], c2: List[float]) -> float:
         The distance between c1 and c2
     """
 
-    # Don't bother calculating distance if coords are the same
-    if c1 == c2:
-        return 0.0
-
     earth_radius = 6371
 
     lat_1, lon_1 = math.radians(c1[0]), math.radians(c1[1])
@@ -286,7 +288,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     linewidth = [1] * len(gdf)
 
     colors[514] = "red"
-    linewidth[514] = 2
+    linewidth[514] = 4
 
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
              linewidth=linewidth, colors=colors)
@@ -303,8 +305,17 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
     geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
 
+    tri = get_enclosing_triangle(lines[514]["coords"][0], ico_vertices_geo)
+    for point in tri:
+        geometry.append(Point(np.flip(point)))
+
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
+    colors = ["red"] * len(gdf)
+    colors[-3] = "orange"
+    colors[-2] = "orange"
+    colors[-1] = "orange"
+
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors)
 
     # Focus the view on line on index 514
     ax.set_extent([-55, -10, 5, 40], crs=ccrs.PlateCarree())
