@@ -305,28 +305,20 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
     geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
 
-    # Get enclosing triangle and add to geometry
-    tri = get_enclosing_triangle(lines[514]["coords"][0], ico_vertices_geo)
-    for point in tri:
-        geometry.append(Point(np.flip(point)))
+    subdivs = 8
+    query_points = ico_vertices_geo
+    point = lines[514]["coords"][0]
+    for i in range(subdivs):
+        tri = get_enclosing_triangle(point, query_points)
+        sub = subdivide_triangle([to_xyz(p) for p in tri])
+        sub_latlon = [to_lat_lon(p) for p in sub]
 
-    sub = subdivide_triangle([to_xyz(p) for p in tri])
-    sub_latlon = [to_lat_lon(p) for p in sub]
-    for point in sub_latlon:
-        geometry.append(Point(np.flip(point)))
-
-    tri = get_enclosing_triangle(lines[514]["coords"][0], np.vstack((tri, sub_latlon)))
-    for point in tri:
-        geometry.append(Point(np.flip(point)))
+        query_points = np.vstack((tri, sub_latlon))
+        for p in sub_latlon:
+            geometry.append(Point(np.flip(p)))
 
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     colors = ["red"] * len(gdf)
-    colors[-6] = "black"
-    colors[-5] = "black"
-    colors[-4] = "black"
-    colors[-3] = "orange"
-    colors[-2] = "orange"
-    colors[-1] = "orange"
 
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors)
 
