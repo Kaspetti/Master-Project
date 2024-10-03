@@ -153,15 +153,15 @@ def get_enclosing_triangle(line_point: List[float],
         line point. These 3 points form the triangle enclosing the point
     '''
 
-    dists = [haversine(line_point, ico_point) for ico_point in ico_points]
-    sort_indices = np.argsort(dists)
+    # dists = [haversine(line_point, ico_point) for ico_point in ico_points]
+    # sort_indices = np.argsort(dists)
+    #
+    # return np.array(ico_points)[sort_indices[:3]]
 
-    return np.array(ico_points)[sort_indices[:3]]
+    dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
+    sort_indices = np.argsort(dist_sqrd)
 
-    # dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
-    # sort_indices = np.argsort(dist_sqrd)
-
-    # return ico_points[sort_indices[:3]]
+    return ico_points[sort_indices[:3]]
 
 
 def subdivide_triangle(ps: List[List[float]]) -> List[List[float]]:
@@ -304,23 +304,39 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     ico_vertices, faces = icosphere(nu)
     ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
     geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
-    subdivs = 8
-    query_points = ico_vertices_geo
-    point = lines[514]["coords"][0]
-    for i in range(subdivs):
-        tri = get_enclosing_triangle(point, query_points)
-        sub = subdivide_triangle([to_xyz(p) for p in tri])
-        sub_latlon = [to_lat_lon(p) for p in sub]
+    subdivs = 2
+    for i, coord in enumerate(lines[514]["coords"]):
 
-        query_points = np.vstack((tri, sub_latlon))
-        for p in sub_latlon:
-            geometry.append(Point(np.flip(p)))
+        if i != 16:
+            continue
+        print(f"Subdividing {i}")
+        geometry = []
+        query_points = ico_vertices_geo
 
-    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    colors = ["red"] * len(gdf)
+        for i in range(subdivs):
+            tri = get_enclosing_triangle(coord, query_points)
+            sub = subdivide_triangle([to_xyz(p) for p in tri])
+            sub_latlon = [to_lat_lon(p) for p in sub]
 
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors)
+            query_points = np.vstack((tri, sub_latlon))
+
+            if i == subdivs - 1:
+                tri = get_enclosing_triangle(coord, query_points)
+                for p in tri:
+                    geometry.append(Point(np.flip(p)))
+
+        geometry.append(Point(np.flip(coord)))
+
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+        colors = ["orange"] * len(gdf)
+        colors[-1] = "black"
+        # colors[-3] = "orange"
+        # colors[-2] = "orange"
+        # colors[-1] = "orange"
+
+        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors, zorder=100)
 
     # Focus the view on line on index 514
     ax.set_extent([-55, -10, 5, 40], crs=ccrs.PlateCarree())
