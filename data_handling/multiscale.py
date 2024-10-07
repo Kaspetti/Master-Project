@@ -33,7 +33,7 @@ def to_lat_lon(v: List[float]) -> List[float]:
     lat = math.degrees(math.asin(v[2]))
     lon = math.degrees(math.atan2(v[1], v[0]))
 
-    return [lat, lon]
+    return [lon, lat]
 
 
 def to_xyz(v: List[float]) -> List[float]:
@@ -44,7 +44,7 @@ def to_xyz(v: List[float]) -> List[float]:
     Parameters
     ----------
     v : List[float] of shape (2,)
-        The spherical coordinate (lat/lon) to convert
+        The spherical coordinate (lon/lat) to convert
 
     Returns
     -------
@@ -52,9 +52,9 @@ def to_xyz(v: List[float]) -> List[float]:
         The coordinate represented as [x, y, z] coordinates on the unit sphere
     '''
 
-    x = math.cos(math.radians(v[0])) * math.cos(math.radians(v[1]))
-    y = math.cos(math.radians(v[0])) * math.sin(math.radians(v[1]))
-    z = math.sin(math.radians(v[0]))
+    x = math.cos(math.radians(v[1])) * math.cos(math.radians(v[0]))
+    y = math.cos(math.radians(v[1])) * math.sin(math.radians(v[0]))
+    z = math.sin(math.radians(v[1]))
 
     return [x, y, z]
 
@@ -98,7 +98,7 @@ def get_all_lines(start: str, time_offset: int) -> List[Line]:
             max_lon = max(line.longitude.values)
 
             coords = np.column_stack(
-                        (line.latitude.values, line.longitude.values)
+                        (line.longitude.values, line.latitude.values)
                     )
 
             if max_lon - min_lon > 180:
@@ -127,8 +127,8 @@ def dateline_fix(coords: List[float]) -> List[float]:
     '''
     for i in range(len(coords)):
         coord = coords[i]
-        if coord[1] < 0:
-            coords[i] = (coord[0], coord[1] + 360)
+        if coord[0] < 0:
+            coords[i] = [coord[0] + 360, coord[1]]
 
     return coords
 
@@ -277,7 +277,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
 
     ids = [line["id"] for line in lines]
     df = pd.DataFrame(ids, columns=["id"])
-    geometry = [LineString(np.flip(line["coords"])) for line in lines]
+    geometry = [LineString(line["coords"]) for line in lines]
     gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
 
     fig = plt.figure(figsize=(12, 8))
@@ -303,7 +303,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
              linewidth=linewidth, colors=colors)
 
     # Show points of line 514
-    geometry = [Point(np.flip(coord)) for coord in lines[514]["coords"]]
+    geometry = [Point(coord) for coord in lines[514]["coords"]]
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
              color="green", markersize=100, zorder=100)
@@ -312,11 +312,36 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     nu = 4
     ico_vertices, faces = icosphere(nu)
     ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
-    geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
+    geometry = [Point(coord) for coord in ico_vertices_geo]
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
     # The track points represented at multiscale
     track_points_ms = []
+
+    # All ico points after local subdivision of the icosphere
+    ico_points_ms = pd.DataFrame(columns=[
+        "parent1",
+        "parent2",
+        "msLevel",
+        "x",
+        "y",
+        "z",
+        "lon",
+        "lat",
+    ])
+
+    # Add the original ico points to the ico_points_ms dataframe
+    for i, pt in enumerate(ico_vertices):
+        ico_points_ms.loc[len(ico_points_ms)] = {
+            "msLevel": 0,
+            "x": pt[0],
+            "y": pt[1],
+            "z": pt[2],
+            "lon": ico_vertices_geo[i][0],
+            "lat": ico_vertices_geo[i][1],
+        }
+
+    print(ico_points_ms.head())
 
     subdivs = 5
     for i, coord in enumerate(lines[514]["coords"]):
@@ -332,9 +357,9 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
 
             if i == subdivs - 1:
                 for p in tri:
-                    geometry.append(Point(np.flip(to_lat_lon(p))))
+                    geometry.append(Point(to_lat_lon(p)))
 
-        geometry.append(Point(np.flip(coord)))
+        geometry.append(Point(coord))
 
         gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
         colors = ["orange"] * len(gdf)
