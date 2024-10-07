@@ -197,6 +197,10 @@ def get_enclosing_triangle(line_point: List[float],
 
 def signed_volume(a: List[List[float]], b: List[List[float]],
                   c: List[List[float]], d: List[List[float]]) -> float:
+    """
+    Returns the signed volume of the tetrahedron formed by the points
+    a, b, c, d.
+    """
 
     return (1.0/6.0) * np.dot(np.cross(b-a, c-a), d-a)
 
@@ -249,38 +253,6 @@ def normalize_point(p: List[List[float]]) -> List[List[float]]:
     """
 
     return p / np.linalg.norm(p)
-
-
-def haversine(c1: List[float], c2: List[float]) -> float:
-    """
-    Calculates the distance between two lat/lon points using the
-    haversine formula
-
-    Parameters
-    ----------
-    c1 : List[float] of shape (2,)
-        First coordinate
-    c2 : List[float] of shape (2,)
-        Second coordinate
-
-    Returns
-    -------
-    dist : float
-        The distance between c1 and c2
-    """
-
-    earth_radius = 6371
-
-    lat_1, lon_1 = math.radians(c1[0]), math.radians(c1[1])
-    lat_2, lon_2 = math.radians(c2[0]), math.radians(c2[1])
-
-    d_lat = lat_2 - lat_1
-    d_lon = lon_2 - lon_1
-
-    a = 1 - math.cos(d_lat) + math.cos(lat_1) * math.cos(lat_2) * (1 - math.cos(d_lon))
-    dist = 2 * earth_radius * math.asin(math.sqrt(a / 2))
-
-    return dist
 
 
 def generate_plot(simstart: str, time_offset: int, show: bool = False):
