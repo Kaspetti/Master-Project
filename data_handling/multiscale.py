@@ -136,8 +136,16 @@ def dateline_fix(coords: List[float]) -> List[float]:
 def get_enclosing_triangle(line_point: List[float],
                            ico_points: List[List[float]]) -> List[List[float]]:
     '''
-    Gets the vertices on the icosphere forming a
-    triangle enclosing the line point
+    Gets the vertices on the icosphere forming a triangle enclosing the
+    line point.
+
+    Finds the three closest points of the ico_points to the line_point.
+    Then checks if the line from line_point to (0, 0, 0) crosses the triangle
+    formed by the three closest points. If it doesn't intersect it replaces
+    the third closest point with the fourth closest and returns the points.
+
+    Solutions gotten from:
+        https://stackoverflow.com/questions/42740765/intersection-between-line-and-triangle-in-3d
 
     Parameters
     ----------
@@ -153,15 +161,44 @@ def get_enclosing_triangle(line_point: List[float],
         line point. These 3 points form the triangle enclosing the point
     '''
 
-    # dists = [haversine(line_point, ico_point) for ico_point in ico_points]
-    # sort_indices = np.argsort(dists)
-    #
-    # return np.array(ico_points)[sort_indices[:3]]
+    # Convert ico_points to ndarray for indexing later
+    if ico_points is not np.ndarray:
+        ico_points = np.array(ico_points)
 
+    # Get the three closest points to the line point
     dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
     sort_indices = np.argsort(dist_sqrd)
+    tri = ico_points[sort_indices[:3]]
 
-    return ico_points[sort_indices[:3]]
+    # Two far away points on the line going from origo to the line point
+    q0 = np.multiply(line_point, 10)
+    q1 = np.multiply(line_point, -10)
+
+    # Check if the line passes through the plane created by the three
+    # points in the triangle
+    v0 = signed_volume(q0, tri[0], tri[1], tri[2])
+    v1 = signed_volume(q1, tri[0], tri[1], tri[2])
+
+    if v0 * v1 < 0:
+        # Check if the line passes through the triangle
+        v2 = signed_volume(q0, q1, tri[0], tri[1])
+        v3 = signed_volume(q0, q1, tri[1], tri[2])
+        v4 = signed_volume(q0, q1, tri[2], tri[0])
+
+        if v2 * v3 > 0 and v2 * v4 > 0:
+            return tri
+
+    # If it doesn't cross the triangle we replace the third closest point
+    # with the fourth closest
+    tri[2] = ico_points[sort_indices[3]]
+
+    return tri
+
+
+def signed_volume(a: List[List[float]], b: List[List[float]],
+                  c: List[List[float]], d: List[List[float]]) -> float:
+
+    return (1.0/6.0) * np.dot(np.cross(b-a, c-a), d-a)
 
 
 def subdivide_triangle(ps: List[List[float]]) -> List[List[float]]:
@@ -306,26 +343,24 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     geometry = [Point(np.flip(coord)) for coord in ico_vertices_geo]
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
-    subdivs = 2
-    for i, coord in enumerate(lines[514]["coords"]):
+    # The track points represented at multiscale
+    track_points_ms = []
 
-        if i != 16:
-            continue
+    subdivs = 5
+    for i, coord in enumerate(lines[514]["coords"]):
         print(f"Subdividing {i}")
         geometry = []
-        query_points = ico_vertices_geo
+        query_points = ico_vertices
 
         for i in range(subdivs):
-            tri = get_enclosing_triangle(coord, query_points)
-            sub = subdivide_triangle([to_xyz(p) for p in tri])
-            sub_latlon = [to_lat_lon(p) for p in sub]
+            tri = get_enclosing_triangle(to_xyz(coord), query_points)
+            sub = subdivide_triangle(tri)
 
-            query_points = np.vstack((tri, sub_latlon))
+            query_points = np.vstack((tri, sub))
 
             if i == subdivs - 1:
-                tri = get_enclosing_triangle(coord, query_points)
                 for p in tri:
-                    geometry.append(Point(np.flip(p)))
+                    geometry.append(Point(np.flip(to_lat_lon(p))))
 
         geometry.append(Point(np.flip(coord)))
 
