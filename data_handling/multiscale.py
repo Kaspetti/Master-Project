@@ -16,7 +16,7 @@ class Line(TypedDict):
     coords: List[List[float]]
 
 
-def to_lat_lon(v: List[float]) -> List[float]:
+def to_lon_lat(v: List[float]) -> List[float]:
     '''
     Converts a 3D coordinate into spherical coordinates (lat/lon)
 
@@ -134,7 +134,7 @@ def dateline_fix(coords: List[float]) -> List[float]:
 
 
 def get_enclosing_triangle(line_point: List[float],
-                           ico_points: List[List[float]]) -> List[List[float]]:
+                           ico_points: pd.DataFrame) -> pd.DataFrame:
     '''
     Gets the vertices on the icosphere forming a triangle enclosing the
     line point.
@@ -161,14 +161,14 @@ def get_enclosing_triangle(line_point: List[float],
         line point. These 3 points form the triangle enclosing the point
     '''
 
-    # Convert ico_points to ndarray for indexing later
-    if ico_points is not np.ndarray:
-        ico_points = np.array(ico_points)
+    pts = ico_points[["x", "y", "z"]].to_numpy()
 
     # Get the three closest points to the line point
-    dist_sqrd = np.sum((ico_points - line_point)**2, axis=1)
+    dist_sqrd = np.sum((pts - line_point)**2, axis=1)
     sort_indices = np.argsort(dist_sqrd)
-    tri = ico_points[sort_indices[:3]]
+
+    indices = sort_indices[:3]
+    tri = pts[indices]
 
     # Two far away points on the line going from origo to the line point
     q0 = np.multiply(line_point, 10)
@@ -186,13 +186,13 @@ def get_enclosing_triangle(line_point: List[float],
         v4 = signed_volume(q0, q1, tri[2], tri[0])
 
         if v2 * v3 > 0 and v2 * v4 > 0:
-            return tri
+            return ico_points.iloc[indices]
 
     # If it doesn't cross the triangle we replace the third closest point
     # with the fourth closest
-    tri[2] = ico_points[sort_indices[3]]
+    indices[2] = sort_indices[3]
 
-    return tri
+    return ico_points.iloc[indices]
 
 
 def signed_volume(a: List[List[float]], b: List[List[float]],
@@ -205,7 +205,7 @@ def signed_volume(a: List[List[float]], b: List[List[float]],
     return (1.0/6.0) * np.dot(np.cross(b-a, c-a), d-a)
 
 
-def subdivide_triangle(ps: List[List[float]]) -> List[List[float]]:
+def subdivide_triangle(tri_pts: pd.DataFrame) -> pd.DataFrame:
     '''
     Subdivides a triangle once creating three new points, one
     on the midpoint on all three sides of the triangle
@@ -221,19 +221,46 @@ def subdivide_triangle(ps: List[List[float]]) -> List[List[float]]:
         3 new points which subdivides the original triangle
     '''
 
-    p_1 = [(ps[0][0] + ps[1][0]) / 2,
-           (ps[0][1] + ps[1][1]) / 2,
-           (ps[0][2] + ps[1][2]) / 2]
+    ps = tri_pts[["x", "y", "z"]].to_numpy()
+    ids = tri_pts["id"].to_numpy()
 
-    p_2 = [(ps[0][0] + ps[2][0]) / 2,
-           (ps[0][1] + ps[2][1]) / 2,
-           (ps[0][2] + ps[2][2]) / 2]
+    p_1 = normalize_point([(ps[0][0] + ps[1][0]) / 2,
+                           (ps[0][1] + ps[1][1]) / 2,
+                           (ps[0][2] + ps[1][2]) / 2])
 
-    p_3 = [(ps[1][0] + ps[2][0]) / 2,
-           (ps[1][1] + ps[2][1]) / 2,
-           (ps[1][2] + ps[2][2]) / 2]
+    p_2 = normalize_point([(ps[0][0] + ps[2][0]) / 2,
+                           (ps[0][1] + ps[2][1]) / 2,
+                           (ps[0][2] + ps[2][2]) / 2])
 
-    return [normalize_point(p_1), normalize_point(p_2), normalize_point(p_3)]
+    p_3 = normalize_point([(ps[1][0] + ps[2][0]) / 2,
+                           (ps[1][1] + ps[2][1]) / 2,
+                           (ps[1][2] + ps[2][2]) / 2])
+
+    data = [
+        {
+            "parent1": min(ids[0], ids[1]),
+            "parent2": max(ids[0], ids[1]),
+            "x": p_1[0],
+            "y": p_1[1],
+            "z": p_1[2],
+        },
+        {
+            "parent1": min(ids[0], ids[2]),
+            "parent2": max(ids[0], ids[2]),
+            "x": p_2[0],
+            "y": p_2[1],
+            "z": p_2[2],
+        },
+        {
+            "parent1": min(ids[1], ids[2]),
+            "parent2": max(ids[1], ids[2]),
+            "x": p_3[0],
+            "y": p_3[1],
+            "z": p_3[2],
+        },
+    ]
+
+    return pd.DataFrame(data)
 
 
 def normalize_point(p: List[List[float]]) -> List[List[float]]:
@@ -311,7 +338,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     # Visualize the vertices of the icosphere
     nu = 4
     ico_vertices, faces = icosphere(nu)
-    ico_vertices_geo = [to_lat_lon(coord) for coord in ico_vertices]
+    ico_vertices_geo = [to_lon_lat(coord) for coord in ico_vertices]
     geometry = [Point(coord) for coord in ico_vertices_geo]
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
 
@@ -320,6 +347,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
 
     # All ico points after local subdivision of the icosphere
     ico_points_ms = pd.DataFrame(columns=[
+        "id",
         "parent1",
         "parent2",
         "msLevel",
@@ -333,6 +361,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     # Add the original ico points to the ico_points_ms dataframe
     for i, pt in enumerate(ico_vertices):
         ico_points_ms.loc[len(ico_points_ms)] = {
+            "id": i,
             "msLevel": 0,
             "x": pt[0],
             "y": pt[1],
@@ -341,23 +370,56 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
             "lat": ico_vertices_geo[i][1],
         }
 
-    print(ico_points_ms.head())
-
     subdivs = 5
     for i, coord in enumerate(lines[514]["coords"]):
         print(f"Subdividing {i}")
         geometry = []
-        query_points = ico_vertices
+        query_points = ico_points_ms.loc[(ico_points_ms["msLevel"] == 0)][["id", "x", "y", "z"]]
 
         for i in range(subdivs):
             tri = get_enclosing_triangle(to_xyz(coord), query_points)
             sub = subdivide_triangle(tri)
 
-            query_points = np.vstack((tri, sub))
+            next_query = pd.DataFrame(tri, columns=["id", "x", "y", "z"]).reset_index(drop=True)
+            for index, pt in sub.iterrows():
+                # Does the subdivided point already exists?
+                existing = ico_points_ms.loc[
+                        (ico_points_ms["parent1"] == pt["parent1"]) &
+                        (ico_points_ms["parent2"] == pt["parent2"])
+                ]
+                if not existing.empty:
+                    next_query = pd.concat([next_query,
+                                            existing[["id", "x", "y", "z"]]],
+                                           ignore_index=True)
+                    continue
+
+                # Add the subdivided point to ico_points_ms
+                next_query.loc[len(next_query)] = {
+                    "id": len(ico_points_ms),
+                    "x": pt["x"],
+                    "y": pt["y"],
+                    "z": pt["z"],
+                }
+
+                geo_coord = to_lon_lat([pt["x"], pt["y"], pt["z"]])
+                ico_points_ms.loc[len(ico_points_ms)] = {
+                    "id": len(ico_points_ms),
+                    "parent1": pt["parent1"],
+                    "parent2": pt["parent2"],
+                    "msLevel": i+1,
+                    "x": pt["x"],
+                    "y": pt["y"],
+                    "z": pt["z"],
+                    "lon": geo_coord[0],
+                    "lat": geo_coord[1],
+                }
+
+            query_points = next_query
 
             if i == subdivs - 1:
-                for p in tri:
-                    geometry.append(Point(to_lat_lon(p)))
+                for index, pt in tri.iterrows():
+                    original_pt = ico_points_ms.loc[(ico_points_ms["id"] == pt["id"])]
+                    geometry.append(Point(original_pt[["lon", "lat"]].to_numpy()))
 
         geometry.append(Point(coord))
 
