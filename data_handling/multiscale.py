@@ -8,7 +8,15 @@ from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from typing import List, TypedDict
+from typing import List, TypedDict, Tuple
+from scipy.spatial import Delaunay
+
+
+class IcoPoint(TypedDict):
+    id: int
+    msLevel: int
+    coord3D: List[float]
+    coordGeo: List[float]
 
 
 class Line(TypedDict):
@@ -134,45 +142,73 @@ def dateline_fix(coords: List[float]) -> List[float]:
 
 
 def get_enclosing_triangle(line_point: List[float],
-                           ico_points: pd.DataFrame) -> pd.DataFrame:
+                           ico_points: List[IcoPoint], triangles: List[List[float]]) -> List[IcoPoint]:
     '''
     Gets the vertices on the icosphere forming a triangle enclosing the
     line point.
-
-    Finds the three closest points of the ico_points to the line_point.
-    Then checks if the line from line_point to (0, 0, 0) crosses the triangle
-    formed by the three closest points. If it doesn't intersect it replaces
-    the third closest point with the fourth closest and returns the points.
-
-    Solutions gotten from:
-        https://stackoverflow.com/questions/42740765/intersection-between-line-and-triangle-in-3d
 
     Parameters
     ----------
     line_point : List[float] of shape (3,)
         The 3D point to get the enclosing triangle of (x, y, z)
-    ico_points : List[List[float]] of shape (n, 3) with n = verts in icosphere
+    ico_points : List[IcoPoint] of shape (n, 3) with n = verts in icosphere
         All the vertices of the ico sphere
 
     Returns
     -------
-    closest : List[List[float]] of shape (3, 3)
-        The coordinates of the 3 closest points on the icosphere to the
+    closest : List[IcoPoint] of shape (3,)
+        The 3 closest points on the icosphere to the
         line point. These 3 points form the triangle enclosing the point
     '''
 
-    pts = ico_points[["x", "y", "z"]].to_numpy()
+
+    ico_points = np.array(ico_points)
 
     # Get the three closest points to the line point
-    dist_sqrd = np.sum((pts - line_point)**2, axis=1)
-    sort_indices = np.argsort(dist_sqrd)
+    ico_points_sorted = np.array(
+            sorted(ico_points,
+                   key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - line_point)**2)))
+            )
 
-    indices = sort_indices[:3]
-    tri = pts[indices]
+    tri = np.array([point["coord3D"] for point in ico_points_sorted[:6]])
+
+    if inside_check(line_point, tri):
+        return ico_points_sorted[:3]
+
+    tri[2] = ico_points_sorted[3]["coord3D"]
+    if inside_check(line_point, tri):
+        return ico_points_sorted[[0, 1, 3]]
+
+    tri[2] = ico_points_sorted[4]["coord3D"]
+    if inside_check(line_point, tri):
+        return ico_points_sorted[[0, 1, 4]]
+
+    return ico_points_sorted[[0, 1, 2]]
+
+
+def inside_check(pt: List[float], tri: List[List[float]]) -> bool:
+    """
+    Checks if a point lies "inside" a triangle by checking if the ray
+    from the point to origo passes through the triangle.
+
+    Solution gotten from:
+        https://stackoverflow.com/questions/42740765/intersection-between-line-and-triangle-in-3d
+
+    Parameters
+    ----------
+    pt : List[float] of shape (3,)
+        The point to check if lies inside the triangle
+    tri : List[List[float]] of shape (3, 3)
+        The points making up the triangle
+
+    Returns
+    -------
+    True if the line passes through, False otherwise
+    """
 
     # Two far away points on the line going from origo to the line point
-    q0 = np.multiply(line_point, 10)
-    q1 = np.multiply(line_point, -10)
+    q0 = np.multiply(pt, 10)
+    q1 = np.multiply(pt, -10)
 
     # Check if the line passes through the plane created by the three
     # points in the triangle
@@ -186,13 +222,9 @@ def get_enclosing_triangle(line_point: List[float],
         v4 = signed_volume(q0, q1, tri[2], tri[0])
 
         if v2 * v3 > 0 and v2 * v4 > 0:
-            return ico_points.iloc[indices]
+            return True
 
-    # If it doesn't cross the triangle we replace the third closest point
-    # with the fourth closest
-    indices[2] = sort_indices[3]
-
-    return ico_points.iloc[indices]
+    return False
 
 
 def signed_volume(a: List[List[float]], b: List[List[float]],
@@ -205,24 +237,26 @@ def signed_volume(a: List[List[float]], b: List[List[float]],
     return (1.0/6.0) * np.dot(np.cross(b-a, c-a), d-a)
 
 
-def subdivide_triangle(tri_pts: pd.DataFrame) -> pd.DataFrame:
+def subdivide_triangle(tri_pts: List[IcoPoint]) -> List[Tuple[Tuple[int, int],
+                                                              List[float]]]:
     '''
     Subdivides a triangle once creating three new points, one
     on the midpoint on all three sides of the triangle
 
     Parameters
     ----------
-    ps : List[List[float]] of shape (3, 3)
+    ps : List[IcoPoint] of shape (3,)
         The points making up the triangle
 
     Returns
     -------
-    subdivided_points : List[List[float]] of shape (3, 3)
-        3 new points which subdivides the original triangle
+    subdivided_points : List[Tuple[Tuple[int, int], List[float]]] of shape (3,)
+        A list of tuples containing the id of the parents of the new point,
+        aswell as the point itself
     '''
 
-    ps = tri_pts[["x", "y", "z"]].to_numpy()
-    ids = tri_pts["id"].to_numpy()
+    ps = [point["coord3D"] for point in tri_pts]
+    ids = [point["id"] for point in tri_pts]
 
     p_1 = normalize_point([(ps[0][0] + ps[1][0]) / 2,
                            (ps[0][1] + ps[1][1]) / 2,
@@ -237,30 +271,12 @@ def subdivide_triangle(tri_pts: pd.DataFrame) -> pd.DataFrame:
                            (ps[1][2] + ps[2][2]) / 2])
 
     data = [
-        {
-            "parent1": min(ids[0], ids[1]),
-            "parent2": max(ids[0], ids[1]),
-            "x": p_1[0],
-            "y": p_1[1],
-            "z": p_1[2],
-        },
-        {
-            "parent1": min(ids[0], ids[2]),
-            "parent2": max(ids[0], ids[2]),
-            "x": p_2[0],
-            "y": p_2[1],
-            "z": p_2[2],
-        },
-        {
-            "parent1": min(ids[1], ids[2]),
-            "parent2": max(ids[1], ids[2]),
-            "x": p_3[0],
-            "y": p_3[1],
-            "z": p_3[2],
-        },
+        ((min(ids[0], ids[1]), max(ids[0], ids[1])), p_1),
+        ((min(ids[0], ids[2]), max(ids[0], ids[2])), p_2),
+        ((min(ids[1], ids[2]), max(ids[1], ids[2])), p_3),
     ]
 
-    return pd.DataFrame(data)
+    return data
 
 
 def normalize_point(p: List[List[float]]) -> List[List[float]]:
@@ -310,134 +326,117 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="blue")
+
     ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")
     ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")
     ax.add_feature(cfeature.COASTLINE, edgecolor="black")
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
 
-    # gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1)
-
-    # START OF DEBUG #
-
-    # Visualize line 514 in red with a bolder line
-    colors = ["blue"] * len(gdf)
-    linewidth = [1] * len(gdf)
-
-    colors[514] = "red"
-    linewidth[514] = 4
-
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
-             linewidth=linewidth, colors=colors)
-
-    # Show points of line 514
-    geometry = [Point(coord) for coord in lines[514]["coords"]]
-    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(),
-             color="green", markersize=100, zorder=100)
-
     # Visualize the vertices of the icosphere
     nu = 4
     ico_vertices, faces = icosphere(nu)
-    ico_vertices_geo = [to_lon_lat(coord) for coord in ico_vertices]
-    geometry = [Point(coord) for coord in ico_vertices_geo]
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red")
-
-    # The track points represented at multiscale
-    track_points_ms = []
-
-    # All ico points after local subdivision of the icosphere
-    ico_points_ms = pd.DataFrame(columns=[
-        "id",
-        "parent1",
-        "parent2",
-        "msLevel",
-        "x",
-        "y",
-        "z",
-        "lon",
-        "lat",
-    ])
-
-    # Add the original ico points to the ico_points_ms dataframe
-    for i, pt in enumerate(ico_vertices):
-        ico_points_ms.loc[len(ico_points_ms)] = {
-            "id": i,
-            "msLevel": 0,
-            "x": pt[0],
-            "y": pt[1],
-            "z": pt[2],
-            "lon": ico_vertices_geo[i][0],
-            "lat": ico_vertices_geo[i][1],
-        }
+    geometry = [Point(to_lon_lat(coord)) for coord in ico_vertices]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", markersize=1)
 
     subdivs = 5
-    for i, coord in enumerate(lines[514]["coords"]):
-        print(f"Subdividing {i}")
-        geometry = []
-        query_points = ico_points_ms.loc[(ico_points_ms["msLevel"] == 0)][["id", "x", "y", "z"]]
 
-        for i in range(subdivs):
-            tri = get_enclosing_triangle(to_xyz(coord), query_points)
-            sub = subdivide_triangle(tri)
+    points_at_level = {}
+    for i in range(subdivs+1):
+        points_at_level[i] = set()
 
-            next_query = pd.DataFrame(tri, columns=["id", "x", "y", "z"]).reset_index(drop=True)
-            for index, pt in sub.iterrows():
-                # Does the subdivided point already exists?
-                existing = ico_points_ms.loc[
-                        (ico_points_ms["parent1"] == pt["parent1"]) &
-                        (ico_points_ms["parent2"] == pt["parent2"])
-                ]
-                if not existing.empty:
-                    next_query = pd.concat([next_query,
-                                            existing[["id", "x", "y", "z"]]],
-                                           ignore_index=True)
-                    continue
+    ico_points_ms = {}
+    for i, pt in enumerate(ico_vertices):
+        ico_points_ms[(-1, i)] = {
+            "id": i,
+            "msLevel": 0,
+            "coord3D": pt,
+            "coordGeo": to_lon_lat(pt)
+        }
+        points_at_level[0].add((-1, i))
 
-                # Add the subdivided point to ico_points_ms
-                next_query.loc[len(next_query)] = {
-                    "id": len(ico_points_ms),
-                    "x": pt["x"],
-                    "y": pt["y"],
-                    "z": pt["z"],
-                }
+    track_points_ms = {}
 
-                geo_coord = to_lon_lat([pt["x"], pt["y"], pt["z"]])
-                ico_points_ms.loc[len(ico_points_ms)] = {
-                    "id": len(ico_points_ms),
-                    "parent1": pt["parent1"],
-                    "parent2": pt["parent2"],
-                    "msLevel": i+1,
-                    "x": pt["x"],
-                    "y": pt["y"],
-                    "z": pt["z"],
-                    "lon": geo_coord[0],
-                    "lat": geo_coord[1],
-                }
+    points_ms_0 = [ico_points_ms[id] for id in points_at_level[0]]
 
-            query_points = next_query
+    for line in lines:
+        print(f"Processing line: {line['id']}")
 
-            if i == subdivs - 1:
-                for index, pt in tri.iterrows():
-                    original_pt = ico_points_ms.loc[(ico_points_ms["id"] == pt["id"])]
-                    geometry.append(Point(original_pt[["lon", "lat"]].to_numpy()))
+        track_points_ms[line["id"]] = {}
+        # Create track_points_ms for lowest subdivision
+        for k in range(subdivs+1):
+            track_points_ms[line["id"]][k] = {}
 
-        geometry.append(Point(coord))
+        for i, coord in enumerate(line["coords"]):
+            # This does not have to be computed for each coord.. TODO
+            query_points = points_ms_0
+            coord3D = to_xyz(coord)
 
-        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-        colors = ["orange"] * len(gdf)
-        colors[-1] = "black"
-        # colors[-3] = "orange"
-        # colors[-2] = "orange"
-        # colors[-1] = "orange"
+            closest = sorted(query_points,
+                             key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
 
-        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors, zorder=100)
+            dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
+            if closest["id"] in track_points_ms[line["id"]][0]:
+                pt, dist2 = track_points_ms[line["id"]][0][closest["id"]]
 
-    # Focus the view on line on index 514
-    ax.set_extent([-55, -10, 5, 40], crs=ccrs.PlateCarree())
+                if dist1 < dist2:
+                    track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
+            else:
+                track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
 
-    # END OF DEBUG #
+            for j in range(subdivs):
+                tri = get_enclosing_triangle(coord3D, query_points, faces)
+                sub = subdivide_triangle(tri)
 
-    # ax.set_global()
+                next_query = tri
+                for (parents, pt) in sub:
+                    if parents in ico_points_ms:
+                        next_query = np.append(next_query, ico_points_ms[parents])
+                        continue
+
+                    ico_point = {
+                        "id": len(ico_points_ms),
+                        "msLevel": j+1,
+                        "coord3D": pt,
+                        "coordGeo": to_lon_lat(pt)
+                    }
+
+                    next_query = np.append(next_query, ico_point)
+                    ico_points_ms[parents] = ico_point
+
+                    # Create track points for this subdivision
+                    closest = sorted(query_points,
+                                     key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
+
+                    dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
+                    if closest["id"] in track_points_ms[line["id"]][j+1]:
+                        pt, dist2 = track_points_ms[line["id"]][j+1][closest["id"]]
+
+                        if dist1 < dist2:
+                            track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
+                    else:
+                        track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
+
+                query_points = next_query
+
+    # Test visualize MS
+    ms_level = 5
+    geometry = []
+    for line in lines:
+        points = [track_points_ms[line["id"]][ms_level][ico_pt][0] for ico_pt in track_points_ms[line["id"]][ms_level]]
+        for pt in points:
+            geometry.append(Point(to_lon_lat(pt)))
+
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), markersize=5, color="orange", zorder=1000)
+
+    geo_points = [point["coordGeo"] for point in ico_points_ms.values()]
+    geometry = [Point(pt) for pt in geo_points]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=100, markersize=1)
+
+    ax.set_global()
     ax.gridlines(draw_labels=True, dms=True, x_inline=False, y_inline=False)
 
     if show:
