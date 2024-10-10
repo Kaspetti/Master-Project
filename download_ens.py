@@ -6,16 +6,21 @@ def filename(x, d):
     return f"ec.ens_{x}.{d}.sfc.mta.nc"
 
 
-date = "2024070112"
+dates = [
+        "2024092912",
+        ]
 
-if not os.path.exists(f"./{date}"):
-    os.mkdir(f"./{date}")
+# date = "2024092300"
 
-for i in range(50):
-    f = filename(f"{i:02d}", date)
-    print(f"Downloading '{f}'")
+for date in dates:
+    if not os.path.exists(f"./data/{date}"):
+        os.mkdir(f"./data/{date}")
 
-    urllib.request.urlretrieve(
-            f"https://iveret.gfi.uib.no/mtaens/{f}",
-            f"./{date}/{f}"
-    )
+    for i in range(50):
+        f = filename(f"{i:02d}", date)
+        print(f"Downloading '{f}'")
+
+        urllib.request.urlretrieve(
+                f"https://iveret.gfi.uib.no/mtaens/{f}",
+                f"./data/{date}/{f}"
+                )

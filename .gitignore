@@ -8,3 +8,7 @@ node_modules/
 
 test.py
 index.html
+
+*.png
+images/
+data/
