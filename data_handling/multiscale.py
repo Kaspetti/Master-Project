@@ -142,7 +142,7 @@ def dateline_fix(coords: List[float]) -> List[float]:
 
 
 def get_enclosing_triangle(line_point: List[float],
-                           ico_points: List[IcoPoint], triangles: List[List[float]]) -> List[IcoPoint]:
+                           ico_points: List[IcoPoint]) -> List[IcoPoint]:
     '''
     Gets the vertices on the icosphere forming a triangle enclosing the
     line point.
@@ -160,7 +160,6 @@ def get_enclosing_triangle(line_point: List[float],
         The 3 closest points on the icosphere to the
         line point. These 3 points form the triangle enclosing the point
     '''
-
 
     ico_points = np.array(ico_points)
 
@@ -298,6 +297,90 @@ def normalize_point(p: List[List[float]]) -> List[List[float]]:
     return p / np.linalg.norm(p)
 
 
+def multiscale(ico_points: List[List[float]],
+               lines: List[Line],
+               subdivs: int):
+
+    points_at_level = {}
+    for i in range(subdivs+1):
+        points_at_level[i] = set()
+
+    ico_points_ms = {}
+    for i, pt in enumerate(ico_points):
+        ico_points_ms[(-1, i)] = {
+            "id": i,
+            "msLevel": 0,
+            "coord3D": pt,
+            "coordGeo": to_lon_lat(pt)
+        }
+        points_at_level[0].add((-1, i))
+
+    track_points_ms = {}
+    points_ms_0 = [ico_points_ms[id] for id in points_at_level[0]]
+
+    for line in lines:
+        print(f"Processing line: {line['id']}")
+
+        track_points_ms[line["id"]] = {}
+        # Create track_points_ms for lowest subdivision
+        for k in range(subdivs+1):
+            track_points_ms[line["id"]][k] = {}
+
+        for i, coord in enumerate(line["coords"]):
+            # This does not have to be computed for each coord.. TODO
+            query_points = points_ms_0
+            coord3D = to_xyz(coord)
+
+            closest = sorted(query_points,
+                             key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
+
+            dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
+            if closest["id"] in track_points_ms[line["id"]][0]:
+                pt, dist2 = track_points_ms[line["id"]][0][closest["id"]]
+
+                if dist1 < dist2:
+                    track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
+            else:
+                track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
+
+            for j in range(subdivs):
+                tri = get_enclosing_triangle(coord3D, query_points)
+                sub = subdivide_triangle(tri)
+
+                next_query = tri
+                for (parents, pt) in sub:
+                    if parents in ico_points_ms:
+                        next_query = np.append(next_query, ico_points_ms[parents])
+                        continue
+
+                    ico_point = {
+                        "id": len(ico_points_ms),
+                        "msLevel": j+1,
+                        "coord3D": pt,
+                        "coordGeo": to_lon_lat(pt)
+                    }
+
+                    next_query = np.append(next_query, ico_point)
+                    ico_points_ms[parents] = ico_point
+
+                    # Create track points for this subdivision
+                    closest = sorted(query_points,
+                                     key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
+
+                    dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
+                    if closest["id"] in track_points_ms[line["id"]][j+1]:
+                        pt, dist2 = track_points_ms[line["id"]][j+1][closest["id"]]
+
+                        if dist1 < dist2:
+                            track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
+                    else:
+                        track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
+
+                query_points = next_query
+
+    return ico_points_ms, points_at_level, track_points_ms
+
+
 def generate_plot(simstart: str, time_offset: int, show: bool = False):
     """
     Generates a plot of the lines from a given simulation start and a
@@ -340,85 +423,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", markersize=1)
 
-    subdivs = 5
-
-    points_at_level = {}
-    for i in range(subdivs+1):
-        points_at_level[i] = set()
-
-    ico_points_ms = {}
-    for i, pt in enumerate(ico_vertices):
-        ico_points_ms[(-1, i)] = {
-            "id": i,
-            "msLevel": 0,
-            "coord3D": pt,
-            "coordGeo": to_lon_lat(pt)
-        }
-        points_at_level[0].add((-1, i))
-
-    track_points_ms = {}
-
-    points_ms_0 = [ico_points_ms[id] for id in points_at_level[0]]
-
-    for line in lines:
-        print(f"Processing line: {line['id']}")
-
-        track_points_ms[line["id"]] = {}
-        # Create track_points_ms for lowest subdivision
-        for k in range(subdivs+1):
-            track_points_ms[line["id"]][k] = {}
-
-        for i, coord in enumerate(line["coords"]):
-            # This does not have to be computed for each coord.. TODO
-            query_points = points_ms_0
-            coord3D = to_xyz(coord)
-
-            closest = sorted(query_points,
-                             key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
-
-            dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
-            if closest["id"] in track_points_ms[line["id"]][0]:
-                pt, dist2 = track_points_ms[line["id"]][0][closest["id"]]
-
-                if dist1 < dist2:
-                    track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
-            else:
-                track_points_ms[line["id"]][0][closest["id"]] = (coord3D, dist1)
-
-            for j in range(subdivs):
-                tri = get_enclosing_triangle(coord3D, query_points, faces)
-                sub = subdivide_triangle(tri)
-
-                next_query = tri
-                for (parents, pt) in sub:
-                    if parents in ico_points_ms:
-                        next_query = np.append(next_query, ico_points_ms[parents])
-                        continue
-
-                    ico_point = {
-                        "id": len(ico_points_ms),
-                        "msLevel": j+1,
-                        "coord3D": pt,
-                        "coordGeo": to_lon_lat(pt)
-                    }
-
-                    next_query = np.append(next_query, ico_point)
-                    ico_points_ms[parents] = ico_point
-
-                    # Create track points for this subdivision
-                    closest = sorted(query_points,
-                                     key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
-
-                    dist1 = np.sqrt(np.sum((coord3D - closest["coord3D"])**2))
-                    if closest["id"] in track_points_ms[line["id"]][j+1]:
-                        pt, dist2 = track_points_ms[line["id"]][j+1][closest["id"]]
-
-                        if dist1 < dist2:
-                            track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
-                    else:
-                        track_points_ms[line["id"]][j+1][closest["id"]] = (coord3D, dist1)
-
-                query_points = next_query
+    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 5)
 
     # Test visualize MS
     ms_level = 5
