@@ -306,15 +306,22 @@ def multiscale(ico_points: List[List[float]],
     for i in range(subdivs+1):
         points_at_level[i] = set()
 
+    # Edges which are already subdivided. Used to check if
+    # a subdivided point should be added to ico_points_ms or if
+    # it is already present
+    subdivided_edges = {}
+
     ico_points_ms = {}
     for i, pt in enumerate(ico_points):
-        ico_points_ms[(-1, i)] = {
+        ico_points_ms[i] = {
             "id": i,
+            "parent1": -1,
+            "parent2": -1,
             "msLevel": 0,
             "coord3D": pt,
             "coordGeo": to_lon_lat(pt)
         }
-        points_at_level[0].add((-1, i))
+        points_at_level[0].add(i)
 
     track_points_ms = {}
     points_ms_0 = np.array([ico_points_ms[id] for id in points_at_level[0]])
@@ -352,19 +359,24 @@ def multiscale(ico_points: List[List[float]],
 
                 next_query = tri
                 for (parents, pt) in sub:
-                    if parents in ico_points_ms:
-                        next_query = np.append(next_query, ico_points_ms[parents])
+                    if parents in subdivided_edges:
+                        next_query = np.append(next_query, ico_points_ms[subdivided_edges[parents]])
                         continue
 
+                    id = len(ico_points_ms)
                     ico_point = {
-                        "id": len(ico_points_ms),
+                        "id": id,
+                        "parent1": parents[0],
+                        "parent2": parents[1],
                         "msLevel": j+1,
                         "coord3D": pt,
                         "coordGeo": to_lon_lat(pt)
                     }
 
                     next_query = np.append(next_query, ico_point)
-                    ico_points_ms[parents] = ico_point
+                    subdivided_edges[parents] = id
+                    ico_points_ms[id] = ico_point
+                    points_at_level[j+1].add(id)
 
                     # Create track points for this subdivision
                     closest = sorted(query_points,
@@ -420,24 +432,23 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
 
     # Visualize the vertices of the icosphere
-    nu = 8
+    nu = 2
     ico_vertices, faces = icosphere(nu)
-    geometry = [Point(to_lon_lat(coord)) for coord in ico_vertices]
-    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", markersize=1)
 
-    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 3)
+    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 5)
 
     # Test visualize MS
-    ms_level = 3
+    ms_level = 0
     geometry = []
     for line in lines:
-        points = [track_points_ms[line["id"]][ms_level][ico_pt][0] for ico_pt in track_points_ms[line["id"]][ms_level]]
+        points = [ico_points_ms[id]["coordGeo"] for id in track_points_ms[line["id"]][ms_level].keys()]
+        # points = [track_points_ms[line["id"]][ms_level][ico_pt][0] for ico_pt in track_points_ms[line["id"]][ms_level]]
         for pt in points:
-            geometry.append(Point(to_lon_lat(pt)))
+            # geometry.append(Point(to_lon_lat(pt)))
+            geometry.append(Point(pt))
 
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), markersize=5, color="orange", zorder=1000)
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), markersize=15, color="black", zorder=1000)
 
     geo_points = [point["coordGeo"] for point in ico_points_ms.values()]
     geometry = [Point(pt) for pt in geo_points]
