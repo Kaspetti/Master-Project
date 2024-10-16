@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 from typing import List, TypedDict, Tuple
-from scipy.spatial import Delaunay
+from scipy.spatial import KDTree
+import time
 
 
 class IcoPoint(TypedDict):
@@ -316,7 +317,8 @@ def multiscale(ico_points: List[List[float]],
         points_at_level[0].add((-1, i))
 
     track_points_ms = {}
-    points_ms_0 = [ico_points_ms[id] for id in points_at_level[0]]
+    points_ms_0 = np.array([ico_points_ms[id] for id in points_at_level[0]])
+    ms_0_kd_tree = KDTree([point["coord3D"] for point in points_ms_0])
 
     for line in lines:
         print(f"Processing line: {line['id']}")
@@ -328,8 +330,9 @@ def multiscale(ico_points: List[List[float]],
 
         for i, coord in enumerate(line["coords"]):
             # This does not have to be computed for each coord.. TODO
-            query_points = points_ms_0
             coord3D = to_xyz(coord)
+            closest = ms_0_kd_tree.query(coord3D, 6)
+            query_points = points_ms_0[closest[1]]
 
             closest = sorted(query_points,
                              key=lambda pt: np.sqrt(np.sum((pt["coord3D"] - coord3D)**2)))[0]
@@ -417,16 +420,16 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")
 
     # Visualize the vertices of the icosphere
-    nu = 4
+    nu = 8
     ico_vertices, faces = icosphere(nu)
     geometry = [Point(to_lon_lat(coord)) for coord in ico_vertices]
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", markersize=1)
 
-    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 5)
+    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 3)
 
     # Test visualize MS
-    ms_level = 5
+    ms_level = 3
     geometry = []
     for line in lines:
         points = [track_points_ms[line["id"]][ms_level][ico_pt][0] for ico_pt in track_points_ms[line["id"]][ms_level]]
@@ -475,5 +478,6 @@ def generate_all_plots(simstart: str):
 
 if __name__ == "__main__":
     generate_plot("2024082300", 0, show=True)
+    # cProfile.run('generate_plot("2024082300", 0, show=True)')
 
     # generate_all_plots("2024082300")
