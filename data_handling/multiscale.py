@@ -298,9 +298,33 @@ def normalize_point(p: List[List[float]]) -> List[List[float]]:
     return p / np.linalg.norm(p)
 
 
-def multiscale(ico_points: List[List[float]],
+def multiscale(ico_points: List[IcoPoint],
                lines: List[Line],
                subdivs: int):
+    """
+    Performs a multiscale subdivision of the icosahedron, returning the new
+    subdivided points aswell as the lines represented at the different
+    subdivision levels.
+
+    Subdivision is performed locally around the lines to prevent too many
+    points created
+
+    Parameters
+    ----------
+    ico_points : List[IcoPoint]
+        A list of the vertices of the icosahedron before subdivision
+    lines : List[Line]
+        A list of the lines which the subdivision and multiscale will
+        occur to and around
+    subdivs : int
+        The amount of subdivision to do. The level of the multiscale
+
+    Returns
+    -------
+    Two data structures. First being the new list of vertices on the
+    icosahedron after subdivision. The second being a data structure
+    containing the representation of the lines at different scales.
+    """
 
     points_at_level = {}
     for i in range(subdivs+1):
@@ -393,7 +417,7 @@ def multiscale(ico_points: List[List[float]],
 
                 query_points = next_query
 
-    return ico_points_ms, points_at_level, track_points_ms
+    return ico_points_ms, track_points_ms
 
 
 def generate_plot(simstart: str, time_offset: int, show: bool = False):
@@ -435,7 +459,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     nu = 2
     ico_vertices, faces = icosphere(nu)
 
-    ico_points_ms, points_at_level, track_points_ms = multiscale(ico_vertices, lines, 5)
+    ico_points_ms, track_points_ms = multiscale(ico_vertices, lines, 5)
 
     # Test visualize MS
     ms_level = 0
