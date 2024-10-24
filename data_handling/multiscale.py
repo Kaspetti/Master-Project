@@ -8,9 +8,8 @@ from shapely.geometry import LineString, Point
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-from typing import List, TypedDict, Tuple
+from typing import List, TypedDict, Tuple, Literal
 from scipy.spatial import KDTree
-import time
 
 
 class IcoPoint(TypedDict):
@@ -68,7 +67,8 @@ def to_xyz(v: List[float]) -> List[float]:
     return [x, y, z]
 
 
-def get_all_lines(start: str, time_offset: int) -> List[Line]:
+def get_all_lines(start: str, time_offset: int,
+                  line_type: Literal['mta', 'jet']) -> List[Line]:
     '''
     Gets all the lines from a NetCDF file given the start date and time offset
 
@@ -80,6 +80,8 @@ def get_all_lines(start: str, time_offset: int) -> List[Line]:
     time_offset : int
         The time offset of the lines from the start time.
         Given as hours from start time
+    line_type : Literal['mta', 'jet']
+        The type of line to visualize, can either be 'jet' or 'mta'
 
     Returns
     -------
@@ -92,8 +94,11 @@ def get_all_lines(start: str, time_offset: int) -> List[Line]:
     start_time = np.datetime64(f"{start[0:4]}-{start[4:6]}-{start[6:8]}T{start[8:10]}:00:00")
 
     for i in range(50):
+        file_path = f"./data/mta/{start}/ec.ens_{i:02d}.{start}.sfc.mta.nc"
+        if line_type == "jet":
+            file_path = f"./data/jet/{start}/ec.ens_{i:02d}.{start}.pv2000.jetaxis.nc"
         ds = xr.open_dataset(
-                f"./data/{start}/ec.ens_{i:02d}.{start}.sfc.mta.nc"
+                file_path
             )
         date_ds = ds.where(
                     ds.date == start_time + np.timedelta64(time_offset, "h"),
@@ -420,7 +425,8 @@ def multiscale(ico_points: List[IcoPoint],
     return ico_points_ms, track_points_ms
 
 
-def generate_plot(simstart: str, time_offset: int, show: bool = False):
+def generate_plot(simstart: str, time_offset: int,
+                  line_type: Literal['mta', 'jet'], show: bool = False):
     """
     Generates a plot of the lines from a given simulation start and a
     time offset. The plot will be saved as a svg file with this naming
@@ -433,12 +439,14 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
         Format: YYYYDDMMHH
     time_offset : int
         The time offset from the simulation start. In hours
+    line_typ : Literal['mta', 'jet']
+        The line type to visualize. Can be one of 'mta' or 'jet'
     show : bool
         If show is set to True then the plot will only be
         shown and not saved. Defaults to False
     """
 
-    lines = get_all_lines(simstart, time_offset)
+    lines = get_all_lines(simstart, time_offset, line_type)
 
     ids = [line["id"] for line in lines]
     df = pd.DataFrame(ids, columns=["id"])
@@ -459,7 +467,7 @@ def generate_plot(simstart: str, time_offset: int, show: bool = False):
     nu = 2
     ico_vertices, faces = icosphere(nu)
 
-    ico_points_ms, track_points_ms = multiscale(ico_vertices, lines, 5)
+    ico_points_ms, track_points_ms = multiscale(ico_vertices, lines, 2)
 
     # Test visualize MS
     ms_level = 0
@@ -512,7 +520,7 @@ def generate_all_plots(simstart: str):
 
 
 if __name__ == "__main__":
-    generate_plot("2024082300", 0, show=True)
+    generate_plot("2024101900", 0, "jet", show=True)
     # cProfile.run('generate_plot("2024082300", 0, show=True)')
 
     # generate_all_plots("2024082300")
