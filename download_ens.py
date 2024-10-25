@@ -20,9 +20,7 @@ def filename(x, d):
         return f"ec.ens_{x}.{d}.sfc.mta.nc"
 
 
-dates = [
-        "2024101900"
-        ]
+dates = ["2024101900"]
 
 
 for date in dates:
@@ -35,6 +33,6 @@ for date in dates:
         print(f"Downloading '{f}'")
 
         urllib.request.urlretrieve(
-                f"https://iveret.gfi.uib.no/{'jetens' if typ == 'jet' else 'mtaens'}/{f}",
-                f"{folder_path}/{f}"
-                )
+            f"https://iveret.gfi.uib.no/{'jetens' if typ == 'jet' else 'mtaens'}/{f}",
+            f"{folder_path}/{f}",
+        )
