@@ -1,8 +1,16 @@
 import urllib.request
 import os
+import sys
 
 
-typ = "jet"
+if len(sys.argv) < 2:
+    print("Line type not specified. Must be one of 'mta' and 'jet'")
+    exit()
+
+typ = sys.argv[1]
+if typ not in {"mta", "jet"}:
+    print(f"Invalid line type '{typ}'. Must be one of 'mta' and 'jet'")
+    exit()
 
 
 def filename(x, d):
@@ -14,33 +22,8 @@ def filename(x, d):
 
 dates = [
         "2024101900"
-        # "2024101900",
-        # "2024101800",
-        # "2024101700",
-        # "2024101600",
-        # "2024101500",
-        # "2024101400",
-        # "2024101300",
-        # "2024101912",
-        # "2024101812",
-        # "2024101712",
-        # "2024101612",
-        # "2024101512",
-        # "2024101412",
-        # "2024101312",
-        # "2024090100",
-        # "2024090800",
-        # "2024091500",
-        # "2024092200",
-        # "2024092900",
-        # "2024090112",
-        # "2024090812",
-        # "2024091512",
-        # "2024092212",
-        # "2024092912",
         ]
 
-# date = "2024092300"
 
 for date in dates:
     folder_path = f"./data/{'jet' if typ == 'jet' else 'mta'}/{date}"
