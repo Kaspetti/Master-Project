@@ -76,9 +76,10 @@ def get_all_lines(
         grouped_ds = list(date_ds.groupby("line_id"))
 
         for id_, line in grouped_ds:
-            coords = [CoordGeo(lon, lat)
-                      for lon, lat in zip(line.longitude.values,
-                                          line.latitude.values)]
+            coords = [
+                CoordGeo(lon, lat)
+                for lon, lat in zip(line.longitude.values, line.latitude.values)
+            ]
 
             if max(line.longitude.values) - min(line.longitude.values) > 180:
                 coords = dateline_fix(coords)
@@ -89,7 +90,7 @@ def get_all_lines(
 
 
 def dateline_fix(coords: List[CoordGeo]) -> List[CoordGeo]:
-    """ Shifts a list of coordinates by 360 degrees longitude.
+    """Shifts a list of coordinates by 360 degrees longitude.
 
     :param coords: The list of coordinates to shift.
     :return: The original coordinates shifted by 360 degrees longitude.

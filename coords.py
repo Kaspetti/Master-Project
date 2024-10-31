@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+
 import math
-from typing import List
+from typing import List, Literal
 
 
 class Coord3D:
@@ -24,6 +25,35 @@ class Coord3D:
     def to_list(self) -> List[float]:
         """Returns the coordinate as a list of three floats"""
         return [self.x, self.y, self.z]
+
+    def drop_axis(self, axis: Literal[0, 1, 2]) -> Coord2D:
+        match axis:
+            case 0:
+                return Coord2D(self.y, self.z)
+            case 1:
+                return Coord2D(self.x, self.z)
+            case 2:
+                return Coord2D(self.x, self.y)
+
+    def mid_point(self, o: Coord3D) -> Coord3D:
+        return Coord3D(
+            x=(self.x + o.x) / 2,
+            y=(self.y + o.y) / 2,
+            z=(self.z + o.z) / 2,
+        )
+
+
+class Coord2D:
+    x: float
+    y: float
+
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+    def to_list(self) -> List[float]:
+        """Returns the coordinate as a list of two floats"""
+        return [self.x, self.y]
 
 
 class CoordGeo:
