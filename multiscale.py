@@ -11,7 +11,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 
-@dataclass
+@dataclass(frozen=True)
 class IcoPoint:
     """A point on an icosphere.
 
@@ -105,42 +105,44 @@ def subdivide_edge(
 
 def multiscale(lines: List[Line], icosphere_nu: int = 2):
     ico_vertices, faces = icosphere(icosphere_nu)  # ms level 0 icopoints
-    # The icopoints at each ms level
-    ico_points_ms = {
-        0: np.array(
-            [
-                IcoPoint(
-                    id=i,
-                    ms_level=0,
-                    coord_3D=Coord3D(coord[0], coord[1], coord[2]),
-                    coord_geo=Coord3D(coord[0], coord[1], coord[2]).to_lon_lat(),
-                )
-                for i, coord in enumerate(ico_vertices)
-            ]
-        )
-    }
+    ico_points_ms = [IcoPoint(
+                        id=i,
+                        ms_level=0,
+                        coord_3D=Coord3D(coord[0], coord[1], coord[2]),
+                        coord_geo=Coord3D(coord[0], coord[1], coord[2]).to_lon_lat()) 
+                     for i, coord in enumerate(ico_vertices)]
+
+    # The multiscale representation of lines at each ms level
+    line_points_ms = {}
+    subdivied_edges = set()
 
     # KDTree of the initial points
-    ms_0_kd_tree = KDTree([pt.coord_3D.to_list() for pt in ico_points_ms[0]])
+    ms_0_kd_tree = KDTree([pt.coord_3D.to_list() for pt in ico_points_ms])
     query_tris = np.array(faces)
 
     subdivisions = 2
     for line in lines:
+        line_points_ms[line.id] = {}
+
         for coord in line.coords:
             coord_3D = coord.to_3D()
             closest_pt = np.array(ms_0_kd_tree.query(coord_3D.to_list(), 1)[1])
+            triangles = np.where(np.isin(query_tris, closest_pt))[0]
 
-            for i in range(subdivisions):
-                triangles = np.where(np.isin(query_tris, closest_pt))[0]
+            for ms_level in range(1, subdivisions+1):
                 tri_indices = get_enclosing_triangle(
-                    coord_3D, query_tris[triangles], ico_points_ms[0]
+                    coord_3D, query_tris[triangles], np.array(ico_points_ms)
                 )
                 if tri_indices.size == 0:
                     print("The fuck?")
                     exit()
 
-                tri_pts = ico_points_ms[0][tri_indices]
-                
-                sub_point_1 = subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms[0]), i+1) 
-                sub_point_2 = subdivide_edge(tri_pts[0], tri_pts[2], len(ico_points_ms[0]), i+1) 
-                sub_point_3 = subdivide_edge(tri_pts[1], tri_pts[2], len(ico_points_ms[0]), i+1) 
+                tri_pts = np.array(ico_points_ms)[tri_indices]
+                subdivision_points = [subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level),
+                                      subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level),
+                                      subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level)]
+
+                for pt in subdivision_points:
+                    if (pt.parent_1, pt.parent_2) in subdivied_edges:
+                        continue
+                    subdivied_edges.add((pt.parent_1, pt.parent_2)) 
