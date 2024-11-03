@@ -9,6 +9,7 @@ from icosphere import icosphere
 from scipy.spatial import KDTree
 import numpy as np
 from numpy.typing import NDArray
+from alive_progress import alive_it
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class IcoPoint:
 
 def get_enclosing_triangle(
     pt: Coord3D, tris: NDArray[np.int_], ico_pts: NDArray[Any]
-) -> NDArray[np.int_]:
+) -> List[int]:
     """Gets which of the given triangles a point lies inside
     
     The point and the triangle points are "projected" to 2D by dropping the largest
@@ -64,7 +65,7 @@ def get_enclosing_triangle(
         ):
             return tri
 
-    return np.empty(0, np.int_)
+    return []
 
 
 def inside_check(pt: Coord2D, tri: List[Coord2D]) -> bool:
@@ -88,14 +89,14 @@ def inside_check(pt: Coord2D, tri: List[Coord2D]) -> bool:
 
 
 def subdivide_edge(
-        e1: IcoPoint, e2: IcoPoint, id: int, ms_level: int
+        e1: IcoPoint, e2: IcoPoint
 ) -> IcoPoint:
 
     mid_point = e1.coord_3D.mid_point(e2.coord_3D)
 
     return IcoPoint(
-        id=id,
-        ms_level=ms_level,
+        id=-1,
+        ms_level=-1,
         coord_3D=mid_point,
         coord_geo=mid_point.to_lon_lat(),
         parent_1=e1 if e1.coord_3D.x >= e2.coord_3D.x else e2,
@@ -106,43 +107,63 @@ def subdivide_edge(
 def multiscale(lines: List[Line], icosphere_nu: int = 2):
     ico_vertices, faces = icosphere(icosphere_nu)  # ms level 0 icopoints
     ico_points_ms = [IcoPoint(
-                        id=i,
-                        ms_level=0,
-                        coord_3D=Coord3D(coord[0], coord[1], coord[2]),
-                        coord_geo=Coord3D(coord[0], coord[1], coord[2]).to_lon_lat()) 
-                     for i, coord in enumerate(ico_vertices)]
+            id=i,
+            ms_level=0,
+            coord_3D=Coord3D(coord[0], coord[1], coord[2]),
+            coord_geo=Coord3D(coord[0], coord[1], coord[2]).to_lon_lat()
+        ) for i, coord in enumerate(ico_vertices)]
 
     # The multiscale representation of lines at each ms level
     line_points_ms = {}
-    subdivied_edges = set()
+    subdivied_edges = {}
 
     # KDTree of the initial points
     ms_0_kd_tree = KDTree([pt.coord_3D.to_list() for pt in ico_points_ms])
     query_tris = np.array(faces)
 
     subdivisions = 2
-    for line in lines:
+    bar = alive_it(lines, title="Performing multiscale", finalize=lambda bar: bar.title('Multiscale success!'))
+    for line in bar:
+        bar.text(f"Current line: {line.id}")    # type: ignore
         line_points_ms[line.id] = {}
 
         for coord in line.coords:
             coord_3D = coord.to_3D()
             closest_pt = np.array(ms_0_kd_tree.query(coord_3D.to_list(), 1)[1])
-            triangles = np.where(np.isin(query_tris, closest_pt))[0]
+            triangles = list(query_tris[np.where(np.isin(query_tris, closest_pt))[0]])
 
             for ms_level in range(1, subdivisions+1):
                 tri_indices = get_enclosing_triangle(
-                    coord_3D, query_tris[triangles], np.array(ico_points_ms)
+                    coord_3D, triangles, np.array(ico_points_ms)    # type: ignore
                 )
-                if tri_indices.size == 0:
-                    print("The fuck?")
+                if len(tri_indices) == 0:
+                    print("Point not inside any triangle")
                     exit()
 
                 tri_pts = np.array(ico_points_ms)[tri_indices]
-                subdivision_points = [subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level),
-                                      subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level),
-                                      subdivide_edge(tri_pts[0], tri_pts[1], len(ico_points_ms), ms_level)]
+                subdivision_points = [subdivide_edge(tri_pts[0], tri_pts[1]),
+                                      subdivide_edge(tri_pts[0], tri_pts[2]),
+                                      subdivide_edge(tri_pts[1], tri_pts[2])]
 
-                for pt in subdivision_points:
-                    if (pt.parent_1, pt.parent_2) in subdivied_edges:
-                        continue
-                    subdivied_edges.add((pt.parent_1, pt.parent_2)) 
+                for n, pt in enumerate(subdivision_points):
+                    if (pt.parent_1, pt.parent_2) not in subdivied_edges:
+                        new_pt = IcoPoint(
+                            id=len(ico_points_ms),
+                            ms_level=ms_level,
+                            coord_3D=pt.coord_3D,
+                            coord_geo=pt.coord_geo,
+                            parent_1=pt.parent_1,
+                            parent_2=pt.parent_2
+                        )
+
+                        subdivied_edges[(new_pt.parent_1, new_pt.parent_2)] = new_pt.id
+                        ico_points_ms.append(new_pt)
+                    else:
+                        subdivision_points[n] = ico_points_ms[subdivied_edges[(pt.parent_1, pt.parent_2)]]
+
+                # triangles = [
+                #     [tri_indices[0], subdivision_points[0].id, subdivision_points[1].id],
+                #     [tri_indices[1], subdivision_points[0].id, subdivision_points[2].id],
+                #     [tri_indices[2], subdivision_points[1].id, subdivision_points[2].id],
+                #     [subdivision_points[0].id, subdivision_points[1].id, subdivision_points[2].id],
+                # ]
