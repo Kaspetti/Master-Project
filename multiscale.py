@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Tuple
 from dataclasses import dataclass
 
 from coords import Coord3D, CoordGeo, Coord2D
@@ -10,9 +10,15 @@ from scipy.spatial import KDTree
 import numpy as np
 from numpy.typing import NDArray
 from alive_progress import alive_it
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import LineString, Point
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 
 
-@dataclass(frozen=True)
+@dataclass
 class IcoPoint:
     """A point on an icosphere.
 
@@ -36,134 +42,284 @@ class IcoPoint:
     ms_level: int
     coord_3D: Coord3D
     coord_geo: CoordGeo
-    parent_1: Optional[IcoPoint] = None
-    parent_2: Optional[IcoPoint] = None
+    parent_1: int
+    parent_2: int
 
 
-def get_enclosing_triangle(
-    pt: Coord3D, tris: NDArray[np.int_], ico_pts: NDArray[Any]
-) -> List[int]:
-    """Gets which of the given triangles a point lies inside
-    
-    The point and the triangle points are "projected" to 2D by dropping the largest
-    absolute value axis and then use barycentric coordinates to check if the point 
-    is inside. If the point is found to be inside a triangle, the indices of the triangle
-    points are returned, if not, an empty list is returned.
+def get_enclosing_triangle(line_point: Coord3D,
+                           ico_points: NDArray[Any]) -> NDArray[Any]:
+    '''
+    Gets the vertices on the icosphere forming a triangle enclosing the
+    line point.
 
-    :param pt: The point to check if lies inside a triangle.
-    :param tris: A list of indices of the points of each triangle.
-    :param ico_pts: All ico points of which the indices of the triangles refer to.
-    :return: The indices of the points in the triangle pt is inside, or an empty list.
+    Parameters
+    ----------
+    line_point : List[float] of shape (3,)
+        The 3D point to get the enclosing triangle of (x, y, z)
+    ico_points : List[IcoPoint] of shape (n, 3) with n = verts in icosphere
+        All the vertices of the ico sphere
+
+    Returns
+    -------
+    closest : List[IcoPoint] of shape (3,)
+        The 3 closest points on the icosphere to the
+        line point. These 3 points form the triangle enclosing the point
+    '''
+
+    # Get the three closest points to the line point
+    ico_points_sorted = np.array(
+            sorted(ico_points,
+                   key=lambda pt: line_point.dist(pt.coord_3D))
+            )
+
+    tri = np.array([point.coord_3D.to_list() for point in ico_points_sorted[:6]])
+
+    if inside_check(line_point.to_ndarray(), tri):
+        return ico_points_sorted[:3]
+
+    tri[2] = ico_points_sorted[3].coord_3D.to_list()
+    if inside_check(line_point.to_ndarray(), tri):
+        return ico_points_sorted[[0, 1, 3]]
+
+    tri[2] = ico_points_sorted[4].coord_3D.to_list()
+    if inside_check(line_point.to_ndarray(), tri):
+        return ico_points_sorted[[0, 1, 4]]
+
+    return ico_points_sorted[[0, 1, 2]]
+
+
+def inside_check(pt: NDArray[np.float_], tri: NDArray[np.float_]) -> bool:
+    """
+    Checks if a point lies "inside" a triangle by checking if the ray
+    from the point to origo passes through the triangle.
+
+    Solution gotten from:
+        https://stackoverflow.com/questions/42740765/intersection-between-line-and-triangle-in-3d
+
+    Parameters
+    ----------
+    pt : List[float] of shape (3,)
+        The point to check if lies inside the triangle
+    tri : List[List[float]] of shape (3, 3)
+        The points making up the triangle
+
+    Returns
+    -------
+    True if the line passes through, False otherwise
     """
 
-    largest_axis = np.argmax(np.abs(pt.to_list()))
-    pt_2D = pt.drop_axis(largest_axis)  # type: ignore
+    # Two far away points on the line going from origo to the line point
+    q0 = np.multiply(pt, 10)
+    q1 = np.multiply(pt, -10)
 
-    for tri in tris:
-        if inside_check(
-            pt_2D, [tri_pt.coord_3D.drop_axis(largest_axis) for tri_pt in ico_pts[tri]]
-        ):
-            return tri
+    # Check if the line passes through the plane created by the three
+    # points in the triangle
+    v0 = signed_volume(q0, tri[0], tri[1], tri[2])
+    v1 = signed_volume(q1, tri[0], tri[1], tri[2])
 
-    return []
+    if v0 * v1 < 0:
+        # Check if the line passes through the triangle
+        v2 = signed_volume(q0, q1, tri[0], tri[1])
+        v3 = signed_volume(q0, q1, tri[1], tri[2])
+        v4 = signed_volume(q0, q1, tri[2], tri[0])
 
+        if v2 * v3 > 0 and v2 * v4 > 0:
+            return True
 
-def inside_check(pt: Coord2D, tri: List[Coord2D]) -> bool:
-    a = (
-        (tri[1].y - tri[2].y) * (pt.x - tri[2].x)
-        + (tri[2].x - tri[1].x) * (pt.y - tri[2].y)
-    ) / (
-        (tri[1].y - tri[2].y) * (tri[0].x - tri[2].x)
-        + (tri[2].x - tri[1].x) * (tri[0].y - tri[2].y)
-    )
-    b = (
-        (tri[2].y - tri[0].y) * (pt.x - tri[2].x)
-        + (tri[0].x - tri[2].x) * (pt.y - tri[2].y)
-    ) / (
-        (tri[1].y - tri[2].y) * (tri[0].x - tri[2].x)
-        + (tri[2].x - tri[1].x) * (tri[0].y - tri[2].y)
-    )
-    c = 1 - a - b
-
-    return 0 <= a <= 1 and 0 <= b <= 1 and 0 <= c <= 1
+    return False
 
 
-def subdivide_edge(
-        e1: IcoPoint, e2: IcoPoint
-) -> IcoPoint:
+def signed_volume(a: NDArray[np.float_], b: NDArray[np.float_],
+                  c: NDArray[np.float_], d: NDArray[np.float_]) -> float:
+    """
+    Returns the signed volume of the tetrahedron formed by the points
+    a, b, c, d.
+    """
 
-    mid_point = e1.coord_3D.mid_point(e2.coord_3D)
-
-    return IcoPoint(
-        id=-1,
-        ms_level=-1,
-        coord_3D=mid_point,
-        coord_geo=mid_point.to_lon_lat(),
-        parent_1=e1 if e1.coord_3D.x >= e2.coord_3D.x else e2,
-        parent_2=e1 if e1.coord_3D.x < e2.coord_3D.x else e2
-    )
+    return (1.0/6.0) * np.dot(np.cross(b-a, c-a), d-a)
 
 
-def multiscale(lines: List[Line], icosphere_nu: int = 2):
-    ico_vertices, faces = icosphere(icosphere_nu)  # ms level 0 icopoints
-    ico_points_ms = [IcoPoint(
+def subdivide_triangle(tri_pts: NDArray[Any]) -> List[Tuple[Tuple[int, int],
+                                                              List[float]]]:
+    '''
+    Subdivides a triangle once creating three new points, one
+    on the midpoint on all three sides of the triangle
+
+    Parameters
+    ----------
+    ps : List[IcoPoint] of shape (3,)
+        The points making up the triangle
+
+    Returns
+    -------
+    subdivided_points : List[Tuple[Tuple[int, int], List[float]]] of shape (3,)
+        A list of tuples containing the id of the parents of the new point,
+        aswell as the point itself
+    '''
+
+    ps = [point.coord_3D for point in tri_pts]
+    ids = [point.id for point in tri_pts]
+
+    p_1 = [(ps[0].x + ps[1].x) / 2,
+           (ps[0].y + ps[1].y) / 2,
+           (ps[0].z + ps[1].z) / 2]
+
+    p_2 = [(ps[0].x + ps[2].x) / 2,
+           (ps[0].y + ps[2].y) / 2,
+           (ps[0].z + ps[2].z) / 2]
+
+    p_3 = [(ps[1].x + ps[2].x) / 2,
+           (ps[1].y + ps[2].y) / 2,
+           (ps[1].z + ps[2].z) / 2]
+
+    data = [
+        ((min(ids[0], ids[1]), max(ids[0], ids[1])), p_1),
+        ((min(ids[0], ids[2]), max(ids[0], ids[2])), p_2),
+        ((min(ids[1], ids[2]), max(ids[1], ids[2])), p_3),
+    ]
+
+    return data # type: ignore
+
+
+def normalize_point(p: NDArray[np.float_]) -> NDArray[np.float_]:
+    """
+    Normalizes the given point making its length equal 1
+
+    Parameters
+    ----------
+    p : List[List[float]] of shape (n,) with n = dimension of the point
+        The point to normalize
+
+    Return
+    ------
+    normalized_p : List[List[float]] of shape (n,) with
+                    n = dimension of the point
+        The normalized point
+    """
+
+    return p / np.linalg.norm(p)
+
+
+def multiscale(lines: List[Line],
+               subdivs: int):
+    """
+    Performs a multiscale subdivision of the icosahedron, returning the new
+    subdivided points aswell as the lines represented at the different
+    subdivision levels.
+
+    Subdivision is performed locally around the lines to prevent too many
+    points created
+
+    Parameters
+    ----------
+    ico_points : List[IcoPoint]
+        A list of the vertices of the icosahedron before subdivision
+    lines : List[Line]
+        A list of the lines which the subdivision and multiscale will
+        occur to and around
+    subdivs : int
+        The amount of subdivision to do. The level of the multiscale
+
+    Returns
+    -------
+    Two data structures. First being the new list of vertices on the
+    icosahedron after subdivision. The second being a data structure
+    containing the representation of the lines at different scales.
+    """
+
+    ico_points, faces = icosphere(2)
+
+    points_at_level = {}
+    for i in range(subdivs+1):
+        points_at_level[i] = set()
+
+    # Edges which are already subdivided. Used to check if
+    # a subdivided point should be added to ico_points_ms or if
+    # it is already present
+    subdivided_edges = {}
+
+    ico_points_ms = {}
+    for i, pt in enumerate(ico_points):
+        coord_3D = Coord3D(x=pt[0], y=pt[1], z=pt[2])
+        ico_points_ms[i] = IcoPoint(
             id=i,
+            parent_1=-1,
+            parent_2=-1,
             ms_level=0,
-            coord_3D=Coord3D(coord[0], coord[1], coord[2]),
-            coord_geo=Coord3D(coord[0], coord[1], coord[2]).to_lon_lat()
-        ) for i, coord in enumerate(ico_vertices)]
+            coord_3D=coord_3D,
+            coord_geo=coord_3D.to_lon_lat()
+        )
+        points_at_level[0].add(i)
 
-    # The multiscale representation of lines at each ms level
-    line_points_ms = {}
-    subdivied_edges = {}
+    track_points_ms = {}
+    points_ms_0 = np.array([ico_points_ms[id] for id in points_at_level[0]])
+    ms_0_kd_tree = KDTree([point.coord_3D.to_list() for point in points_ms_0])
 
-    # KDTree of the initial points
-    ms_0_kd_tree = KDTree([pt.coord_3D.to_list() for pt in ico_points_ms])
-    query_tris = np.array(faces)
+    for line in lines:
+        print(f"Processing line: {line.id}")
 
-    subdivisions = 2
-    bar = alive_it(lines, title="Performing multiscale", finalize=lambda bar: bar.title('Multiscale success!'))
-    for line in bar:
-        bar.text(f"Current line: {line.id}")    # type: ignore
-        line_points_ms[line.id] = {}
+        track_points_ms[line.id] = {}
+        # Create track_points_ms for lowest subdivision
+        for k in range(subdivs+1):
+            track_points_ms[line.id][k] = {}
 
-        for coord in line.coords:
+        for i, coord in enumerate(line.coords):
+            # This does not have to be computed for each coord.. TODO
             coord_3D = coord.to_3D()
-            closest_pt = np.array(ms_0_kd_tree.query(coord_3D.to_list(), 1)[1])
-            triangles = list(query_tris[np.where(np.isin(query_tris, closest_pt))[0]])
+            closest = ms_0_kd_tree.query(coord_3D.to_list(), 6)
+            query_points = points_ms_0[closest[1]]
 
-            for ms_level in range(1, subdivisions+1):
-                tri_indices = get_enclosing_triangle(
-                    coord_3D, triangles, np.array(ico_points_ms)    # type: ignore
-                )
-                if len(tri_indices) == 0:
-                    print("Point not inside any triangle")
-                    exit()
+            closest = sorted(query_points,
+                             key=lambda pt: coord_3D.dist(pt.coord_3D))[0]
 
-                tri_pts = np.array(ico_points_ms)[tri_indices]
-                subdivision_points = [subdivide_edge(tri_pts[0], tri_pts[1]),
-                                      subdivide_edge(tri_pts[0], tri_pts[2]),
-                                      subdivide_edge(tri_pts[1], tri_pts[2])]
+            dist1 = coord_3D.dist(closest.coord_3D)
+            if closest.id in track_points_ms[line.id][0]:
+                pt, dist2 = track_points_ms[line.id][0][closest.id]
 
-                for n, pt in enumerate(subdivision_points):
-                    if (pt.parent_1, pt.parent_2) not in subdivied_edges:
-                        new_pt = IcoPoint(
-                            id=len(ico_points_ms),
-                            ms_level=ms_level,
-                            coord_3D=pt.coord_3D,
-                            coord_geo=pt.coord_geo,
-                            parent_1=pt.parent_1,
-                            parent_2=pt.parent_2
-                        )
+                if dist1 < dist2:
+                    track_points_ms[line.id][0][closest.id] = (coord_3D, dist1)
+            else:
+                track_points_ms[line.id][0][closest.id] = (coord_3D, dist1)
 
-                        subdivied_edges[(new_pt.parent_1, new_pt.parent_2)] = new_pt.id
-                        ico_points_ms.append(new_pt)
+            for j in range(subdivs):
+                tri = get_enclosing_triangle(coord_3D, query_points)
+                sub = subdivide_triangle(tri)
+
+                next_query = tri
+                for (parents, pt) in sub:
+                    if parents in subdivided_edges:
+                        next_query = np.append(next_query, ico_points_ms[subdivided_edges[parents]])
+                        continue
+
+                    id = len(ico_points_ms)
+                    coord_3D = Coord3D(x=pt[0], y=pt[1], z=pt[2])
+                    ico_point = IcoPoint(
+                        id=id,
+                        parent_1=parents[0],
+                        parent_2=parents[1],
+                        ms_level=j+1,
+                        coord_3D=coord_3D,
+                        coord_geo=coord_3D.to_lon_lat()
+                    )
+
+                    next_query = np.append(next_query, ico_point)   # type: ignore
+                    subdivided_edges[parents] = id
+                    ico_points_ms[id] = ico_point
+                    points_at_level[j+1].add(id)
+
+                    # Create track points for this subdivision
+                    closest = sorted(query_points,
+                                     key=lambda pt: coord_3D.dist(pt.coord_3D))[0]
+
+                    dist1 = coord_3D.dist(closest.coord_3D)
+                    if closest.id in track_points_ms[line.id][j+1]:
+                        pt, dist2 = track_points_ms[line.id][j+1][closest.id]
+
+                        if dist1 < dist2:
+                            track_points_ms[line.id][j+1][closest.id] = (coord_3D, dist1)
                     else:
-                        subdivision_points[n] = ico_points_ms[subdivied_edges[(pt.parent_1, pt.parent_2)]]
+                        track_points_ms[line.id][j+1][closest.id] = (coord_3D, dist1)
 
-                # triangles = [
-                #     [tri_indices[0], subdivision_points[0].id, subdivision_points[1].id],
-                #     [tri_indices[1], subdivision_points[0].id, subdivision_points[2].id],
-                #     [tri_indices[2], subdivision_points[1].id, subdivision_points[2].id],
-                #     [subdivision_points[0].id, subdivision_points[1].id, subdivision_points[2].id],
-                # ]
+                query_points = next_query
+
+    return ico_points_ms, track_points_ms

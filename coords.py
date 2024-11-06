@@ -4,6 +4,9 @@ from __future__ import annotations
 import math
 from typing import List, Literal
 
+import numpy as np
+from numpy.typing import NDArray
+
 
 class Coord3D:
     x: float
@@ -15,16 +18,22 @@ class Coord3D:
         self.y = y
         self.z = z
 
+    def __str__(self) -> str:
+        return f"Coord3D({self.x}, {self.y}, {self.z})"
+
     def to_lon_lat(self) -> CoordGeo:
         """Converts a 3D coordinate into longitude and latitude."""
         lat = math.degrees(math.asin(self.z))
         lon = math.degrees(math.atan2(self.y, self.x))
 
-        return CoordGeo(lat, lon)
+        return CoordGeo(lon, lat)
 
     def to_list(self) -> List[float]:
         """Returns the coordinate as a list of three floats"""
         return [self.x, self.y, self.z]
+
+    def to_ndarray(self) -> NDArray[np.float_]:
+        return np.array(self.to_list())
 
     def drop_axis(self, axis: Literal[0, 1, 2]) -> Coord2D:
         match axis:
@@ -42,6 +51,9 @@ class Coord3D:
             z=(self.z + o.z) / 2,
         )
 
+    def dist(self, o: Coord3D) -> float:
+        return np.sqrt(np.sum((self.to_ndarray() - o.to_ndarray())**2))
+
 
 class Coord2D:
     x: float
@@ -50,6 +62,9 @@ class Coord2D:
     def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
+
+    def __str__(self) -> str:
+        return f"Coord2D({self.x}, {self.y})"
 
     def to_list(self) -> List[float]:
         """Returns the coordinate as a list of two floats"""
@@ -63,6 +78,9 @@ class CoordGeo:
     def __init__(self, lon: float, lat: float):
         self.lon = lon
         self.lat = lat
+
+    def __str__(self) -> str:
+        return f"CoordGeo({self.lon}, {self.lat})"
 
     def to_3D(self) -> Coord3D:
         """Converts longitude and latitude to a 3D coordinate."""

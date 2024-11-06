@@ -500,7 +500,38 @@ if __name__ == "__main__":
     # generate_plot("2024101900", 0, "jet", show=True)
     # cProfile.run('generate_plot("2024082300", 0, show=True)')
     lines = get_all_lines("2024101900", 0, "jet")
-    ms = multiscale(lines)
-    # cProfile.run('multiscale(get_all_lines("2024101900", 0, "jet"))')
+    ico_points_ms, _ = multiscale(lines, 4)
 
-    # generate_all_plots("2024082300")
+    ids = [line.id for line in lines]
+    df = pd.DataFrame(ids, columns=["id"])  # type: ignore
+    geometry = [LineString([coord.to_list() for coord in line.coords]) for line in lines]
+    gdf = gpd.GeoDataFrame(df, geometry=geometry, crs="EPSG:4326")
+
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black") # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")   # type: ignore
+    ax.add_feature(cfeature.COASTLINE, edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="blue")
+
+    # Test Visualize MS
+    # ms_level = 0
+    # geometry = []
+    # for line in lines:
+    #     points = [ico_points_ms[id].]
+
+    geo_points = [point.coord_geo.to_list() for point in ico_points_ms.values()]
+    geometry = [Point(pt) for pt in geo_points]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=100, markersize=1)
+
+
+
+    plt.show()
+
+# cProfile.run('multiscale(get_all_lines("2024101900", 0, "jet"))')
+
+# generate_all_plots("2024082300")
