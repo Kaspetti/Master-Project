@@ -18,13 +18,27 @@ class Coord3D:
         self.y = y
         self.z = z
 
+    def __sub__(self, o: Coord3D) -> Coord3D:
+        return Coord3D(
+            x=self.x - o.x,
+            y=self.y - o.y,
+            z=self.z - o.z
+        )
+
+    def __mul__(self, s: int | float) -> Coord3D:
+        return Coord3D(
+            x=self.x * s,
+            y=self.y * s,
+            z=self.z * s
+        )
+
     def __str__(self) -> str:
         return f"Coord3D({self.x}, {self.y}, {self.z})"
 
     def to_lon_lat(self) -> CoordGeo:
         """Converts a 3D coordinate into longitude and latitude."""
-        lat = math.degrees(math.asin(self.z))
         lon = math.degrees(math.atan2(self.y, self.x))
+        lat = math.degrees(math.asin(self.z))
 
         return CoordGeo(lon, lat)
 

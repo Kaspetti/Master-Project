@@ -500,7 +500,7 @@ if __name__ == "__main__":
     # generate_plot("2024101900", 0, "jet", show=True)
     # cProfile.run('generate_plot("2024082300", 0, show=True)')
     lines = get_all_lines("2024101900", 0, "jet")
-    ico_points_ms, _ = multiscale(lines, 4)
+    ico_points_ms, line_points_ms = multiscale(lines, 4)
 
     ids = [line.id for line in lines]
     df = pd.DataFrame(ids, columns=["id"])  # type: ignore
@@ -517,18 +517,10 @@ if __name__ == "__main__":
 
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="blue")
 
-    # Test Visualize MS
-    # ms_level = 0
-    # geometry = []
-    # for line in lines:
-    #     points = [ico_points_ms[id].]
-
     geo_points = [point.coord_geo.to_list() for point in ico_points_ms.values()]
     geometry = [Point(pt) for pt in geo_points]
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=100, markersize=1)
-
-
 
     plt.show()
 
