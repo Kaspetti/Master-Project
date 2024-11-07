@@ -10,6 +10,7 @@ line starting points being shifted.
 
 from typing import List, TypedDict, Tuple, Literal, Set, Dict
 
+from coords import Coord3D
 from line_reader import Line, get_all_lines
 from multiscale import multiscale
 
@@ -500,7 +501,7 @@ if __name__ == "__main__":
     # generate_plot("2024101900", 0, "jet", show=True)
     # cProfile.run('generate_plot("2024082300", 0, show=True)')
     lines = get_all_lines("2024101900", 0, "jet")
-    ico_points_ms, line_points_ms = multiscale(lines, 4)
+    ico_points_ms, line_points_ms = multiscale(lines, 6)
 
     ids = [line.id for line in lines]
     df = pd.DataFrame(ids, columns=["id"])  # type: ignore
@@ -517,13 +518,13 @@ if __name__ == "__main__":
 
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="blue")
 
-    geo_points = [point.coord_geo.to_list() for point in ico_points_ms.values()]
+    geo_points = []
+    for point in ico_points_ms.values():
+        n = point.coord_3D.to_ndarray() / np.linalg.norm(point.coord_3D.to_ndarray())
+        geo_points.append(Coord3D(n[0], n[1], n[2]).to_lon_lat().to_list())
+
     geometry = [Point(pt) for pt in geo_points]
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=100, markersize=1)
 
     plt.show()
-
-# cProfile.run('multiscale(get_all_lines("2024101900", 0, "jet"))')
-
-# generate_all_plots("2024082300")

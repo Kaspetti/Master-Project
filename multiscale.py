@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Optional, List, Any, Tuple
+from typing import List
 from dataclasses import dataclass
 from itertools import combinations
 
-from coords import Coord3D, CoordGeo, Coord2D
+from coords import Coord3D, CoordGeo
 from line_reader import Line
 
 from icosphere import icosphere
@@ -11,13 +11,6 @@ from scipy.spatial import KDTree
 import numpy as np
 from numpy.typing import NDArray
 from alive_progress import alive_it
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import LineString, Point
-import matplotlib.pyplot as plt
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
-
 
 @dataclass
 class IcoPoint:
@@ -57,7 +50,7 @@ class LinePointMS:
     line_point_coord_geo: CoordGeo
 
 
-def inside_check(pt: NDArray[np.float_], tri: NDArray[np.float_]) -> bool:
+def inside_check(pt: NDArray[np.float64], tri: NDArray[np.float64]) -> bool:
     a = (
         (tri[1][1] - tri[2][1]) * (pt[0] - tri[2][0])
         + (tri[2][0] - tri[1][0]) * (pt[1] - tri[2][1])
@@ -78,7 +71,7 @@ def inside_check(pt: NDArray[np.float_], tri: NDArray[np.float_]) -> bool:
 
 
 def multiscale(lines: List[Line], subdivs: int):
-    ico_verts, faces = icosphere(2)
+    ico_verts, _ = icosphere(2)
     ico_points_ms = {}
     subdivided_edges = {}
     line_points_ms = {}
