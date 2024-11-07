@@ -91,7 +91,7 @@ def multiscale(lines: List[Line], subdivs: int):
 
     outside = 0
     outside_after_flip = 0
-    bar = alive_it(lines, title="Performing multiscale")
+    bar = alive_it([lines[3]], title="Performing multiscale")
     for line in bar:
         line_points_ms[line.id] = {}
         for ms_level in range(0, subdivs+1):
@@ -134,6 +134,7 @@ def multiscale(lines: List[Line], subdivs: int):
 
                 is_inside = inside_check(points_2D[3], points_2D[:3])
                 if not is_inside:
+                    print("Still outside:", line.id, i)
                     outside_after_flip += 1
 
             # Check if the current point is the closest of any other line point to its closest ico point
