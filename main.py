@@ -24,7 +24,7 @@ import cartopy.feature as cfeature
 
 if __name__ == "__main__":
     lines = get_all_lines("2024101900", 0, "jet")
-    ico_points_ms, line_points_ms = multiscale(lines, 0)
+    ico_points_ms, line_points_ms = multiscale(lines, 4)
 
     ids = [line.id for line in lines]
     df = pd.DataFrame(ids, columns=["id"])  # type: ignore

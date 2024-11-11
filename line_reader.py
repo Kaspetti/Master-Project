@@ -13,12 +13,15 @@ class Line:
 
     A line is a collection of ordered points.
 
-    Attributes:
-        id (str): The unique identifier of the line.
-            The id is created by combining the ensemble number
-            the line is part of and the line's id in that ensemble.
-            'ensemble_nr|line_id'
-        coords (List[CoordGeo]): A list of the coordinates of the line.
+    Attributes
+    ----------
+    id : str
+        The unique identifier of the line.
+        The id is created by combining the ensemble number
+        the line is part of and the line's id in that ensemble.
+        'ensemble_nr|line_id'
+    coords : List[CoordGeo]
+        A list of the coordinates of the line.
     """
 
     id: str
@@ -45,15 +48,25 @@ def get_all_lines(
     The function expects 50 files, or 50 ensembles, to be present
     in the folder './date/{mta|jet}/{start}'
 
-    :param start: The start time of the computation.
+    Parameters
+    ----------
+    start : str
+        The start time of the computation.
         Must be of the format: YYYYMMDDTT where TT is one of
         00 or 12.
-    :param time_offset: The time offset from the start to get the lines.
+    time_offset : int
+        The time offset from the start to get the lines.
         The offset is given in hours from the start time.
-    :param line_type: The type of the lines to get.
+    line_type : "jet" or "mta"
+        The type of the lines to get.
         Currently supported line types are 'mta' and 'jet'.
-    :return: A list of the lines from the 50 ensembles at the time offset.
+
+    Returns
+    -------
+    l : List[Line]
+        A list of the lines from the 50 ensembles at the time offset.
     """
+
     all_lines = []
 
     start_time = np.datetime64(
@@ -92,9 +105,17 @@ def get_all_lines(
 def dateline_fix(coords: List[CoordGeo]) -> List[CoordGeo]:
     """Shifts a list of coordinates by 360 degrees longitude.
 
-    :param coords: The list of coordinates to shift.
-    :return: The original coordinates shifted by 360 degrees longitude.
+    Parameters
+    ----------
+    coords : List[CoordGeo]
+        The list of coordinates to shift.
+
+    Returns
+    -------
+    l : List[CoordGeo]
+        The original coordinates shifted by 360 degrees longitude.
     """
+
     for i, coord in enumerate(coords):
         if coord.lon < 0:
             coords[i] = CoordGeo(coord.lon + 360, coord.lat)
