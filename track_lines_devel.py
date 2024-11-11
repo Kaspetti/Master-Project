@@ -6,17 +6,86 @@ import pickle
 import numpy as np
 import xarray as xr
 import pandas as pd
+from typing import List
 import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
-import dynlib.utils
+
+import pandas as pd
+import geopandas as gpd
+from shapely.geometry import LineString
+import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+from matplotlib import colormaps
 
 
 SUBSAMPLE = 10
-TRACK_DIST_THRES = 300.0e3
+TRACK_DIST_THRES = 500.0e3
 SUPERSAMPLE_DX = 10.0e3
 MINLEN_OVERLAP = 1000.0e3
 MINCORR_OVERLAP = 0.55
+
+
+def dateline_fix(coords: List[List[float]]) -> List[List[float]]:
+    """Shifts a list of coordinates by 360 degrees longitude.
+
+    Parameters
+    ----------
+    coords : List[CoordGeo]
+        The list of coordinates to shift.
+
+    Returns
+    -------
+    l : List[CoordGeo]
+        The original coordinates shifted by 360 degrees longitude.
+    """
+
+    for i, coord in enumerate(coords):
+        if coord[0] < 0:
+            coords[i] = [coord[0] + 360, coord[1]]
+
+    return coords
+
+
+def dist_sphere(lon1, lat1, lon2, lat2, r=6.37e6):
+    ''' Shortest distance on a sphere
+
+    Calculate the great circle distance between two points on the surface of a sphere, 
+    using spherical trigonometry. By default, the radius of the sphere is assumed to 
+    be the Earth radius, R = 6370 km, but that can be changed via the optional 
+    parameter r.
+
+    Both the first and second points can be an array of points. If both points are
+    actually arrays of points, these arrays must have compatible shapes in the sense of 
+    the numpy broadcasting rules.
+
+    Parameters
+    ----------
+    lon1 : float or np.ndarray
+        Longitude(s) of the first point(s) in degrees.
+    lat1 : float or np.ndarray
+        Latitude(s) of the first point(s) in degrees.
+    lon2 : float or np.ndarray
+        Longitude(s) of the second point(s) in degrees.
+    lat2 : float or np.ndarray
+        Latitude(s) of the second point(s) in degrees.
+    r : float or np.ndarray
+        *Optional*. Radius of the sphere(s). Defaults to the Earth radius.
+    
+    Returns
+    -------
+    float or np.ndarray
+        Distance(s) between the first and second points
+    '''
+        
+    dlon = np.pi/180 * (lon2 - lon1)
+    lat1r = np.pi/180 * lat1
+    lat2r = np.pi/180 * lat2
+    acos = np.sin(lat1r)*np.sin(lat2r) + np.cos(lat1r)*np.cos(lat2r)*np.cos(dlon)
+    dist = r * np.arccos(np.maximum(np.minimum(acos,1.0),-1.0))
+
+    return dist
 
 
 def add_length_col(df):
@@ -30,7 +99,7 @@ def add_length_col(df):
     prev_line = -1
     for idx, cur_line, cur_lat, cur_lon in zip(idxs, line_ids, lats, lons):
         if prev_line == cur_line:
-            dist += dynlib.utils.dist_sphere(cur_lon, cur_lat, prev_lon, prev_lat)
+            dist += dist_sphere(cur_lon, cur_lat, prev_lon, prev_lat)
             dists[idx] = dist
         else:
             dist = 0.0
@@ -54,8 +123,8 @@ def line_supersample(df):
         lon[lon < 0.0] += 360.0
 
     lat = df.latitude.to_numpy()
-    ff = df["ff@maxff"].to_numpy()
-    pt = df["pt@maxff"].to_numpy()
+    # ff = df["ff@maxff"].to_numpy()
+    # pt = df["pt@maxff"].to_numpy()
 
     xnew = np.arange(0, x[-1], SUPERSAMPLE_DX)
 
@@ -63,8 +132,8 @@ def line_supersample(df):
         (
             np.interp(xnew, x, lon),
             np.interp(xnew, x, lat),
-            np.interp(xnew, x, ff),
-            np.interp(xnew, x, pt),
+            # np.interp(xnew, x, ff),
+            # np.interp(xnew, x, pt),
         ),
         axis=-1,
     )
@@ -79,7 +148,7 @@ def find_best_match(i0ref, line0, i1ref, line1):
         if i1 < 0 or i1 >= line1.shape[0]:
             continue
         while i0 > 0 and i1 > 0:
-            dist = dynlib.utils.dist_sphere(
+            dist = dist_sphere(
                 line0[i0, 0], line0[i0, 1], line1[i1, 0], line1[i1, 1]
             )
             i0 -= 1
@@ -92,7 +161,7 @@ def find_best_match(i0ref, line0, i1ref, line1):
         i0 = i0ref
         i1 = i1ref + ioff
         while i0 < line0.shape[0] and i1 < line1.shape[0]:
-            dist = dynlib.utils.dist_sphere(
+            dist = dist_sphere(
                 line0[i0, 0], line0[i0, 1], line1[i1, 0], line1[i1, 1]
             )
             i0 += 1
@@ -156,7 +225,7 @@ def track_lines(df0, df1, debug=False):
     lats1 = df1.latitude.to_numpy()
     lons1 = df1.longitude.to_numpy()
 
-    dists = dynlib.utils.dist_sphere(
+    dists = dist_sphere(
         lons0s[:, np.newaxis],
         lats0s[:, np.newaxis],
         lons1[np.newaxis, :],
@@ -328,6 +397,127 @@ debug_plot = False
 debug_one = None  # (1979,1,14,0)
 
 if __name__ == "__main__":
+    df = xr.open_dataset(
+        # f"./data/jet/2024101900/ec.ens_00.2024101900.pv2000.jetaxis.nc"
+        f"./data/mta/2024101900/ec.ens_00.2024101900.sfc.mta.nc"
+    ).to_dataframe()
+    add_length_col(df)
+
+    available_ids = set(range(1, 1000))
+    time_offset = 0
+    prev_df = pd.DataFrame()
+    geometry = []
+    ids = []
+    while time_offset <= 240:
+        print(time_offset)
+        date = np.datetime64(f"2024-10-19T00:00") + np.timedelta64(time_offset,'h')
+        df0 = df[df.date == date]
+
+        if prev_df.empty:
+            line_ids = df0.line_id.unique()
+            for id in line_ids:
+                available_ids.remove(id)
+        else:
+            # Perform tracking
+            df0.loc[:, 'line_id'] = df0.line_id + 1000
+            df.loc[:, 'line_id'] = df.line_id + 1000
+            matches, _, _ = track_lines(prev_df, df0)
+            prev_ids = [m[0] for m in matches]
+            next_ids = [m[1] for m in matches]
+
+            for id in df0.line_id.unique():
+                if id in next_ids:
+                    i = next_ids.index(id)
+                    df.loc[(df["line_id"] == id) & (df['date'] == date), 'line_id'] = prev_ids[i]
+                else:
+                    df.loc[(df["line_id"] == id) & (df['date'] == date), 'line_id'] = available_ids.pop()
+
+        prev_df = df[df.date == date]
+        for id in prev_df.line_id.unique():
+            coords = np.array(prev_df[prev_df['line_id'] == id][['longitude', 'latitude']].to_numpy())
+            if max(coords[:, 0]) - min(coords[:, 0]) > 180:
+                coords = dateline_fix(coords)
+
+            geometry.append(LineString(coords))
+            ids.append(id)
+
+        if time_offset < 72:
+            time_offset += 3
+        else:
+            time_offset += 6
+
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black") # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")   # type: ignore
+    ax.add_feature(cfeature.COASTLINE, edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    df_id = pd.DataFrame(ids, columns=["id"])   # type: ignore
+    gdf = gpd.GeoDataFrame(df_id, geometry=geometry, crs="EPSG:4326")
+
+    cmap = colormaps["tab20"]
+    norm = plt.Normalize(gdf['id'].min(), gdf['id'].max())
+
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color=cmap(norm(gdf["id"])))
+    plt.show()
+
+
+    # df0 = df[df.date == np.datetime64("2024-10-19T00:00")]
+    # df1 = df[df.date == np.datetime64("2024-10-19T03:00")]
+    #
+    # fig = plt.figure(figsize=(12, 8))
+    # ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
+    #
+    # geometry = []
+    # for id in df0.line_id.unique():
+    #     l1 = df0[df0.line_id == id]
+    #     l1_coords = l1[['longitude', 'latitude']].to_numpy()
+    #     geometry.append(LineString(l1_coords))
+    #     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    #
+    # gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=2, color="pink")
+    #
+    #
+    # geometry = []
+    # for id in df1.line_id.unique():
+    #     l1 = df1[df1.line_id == id]
+    #     l1_coords = l1[['longitude', 'latitude']].to_numpy()
+    #     geometry.append(LineString(l1_coords))
+    #     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
+    #
+    # gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=2, color="cyan")
+    #
+    #
+    # matches, overlaps, N = track_lines(df0, df1)
+    #
+    # g1 = []
+    # g2 = []
+    # for (id1, id2) in matches:
+    #     l1 = df0[df0.line_id == id1]
+    #     l2 = df1[df1.line_id == id2]
+    #
+    #     l1_coords = l1[['longitude', 'latitude']].to_numpy()
+    #     l2_coords = l2[['longitude', 'latitude']].to_numpy()
+    #     g1.append(LineString(l1_coords))
+    #     g2.append(LineString(l2_coords))
+    #
+    # gdf_1 = gpd.GeoDataFrame(pd.DataFrame(), geometry=g1, crs="EPSG:4326")
+    # gdf_2 = gpd.GeoDataFrame(pd.DataFrame(), geometry=g2, crs="EPSG:4326")
+    #
+    # ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black") # type: ignore
+    # ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")   # type: ignore
+    # ax.add_feature(cfeature.COASTLINE, edgecolor="black")   # type: ignore
+    # ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+    #
+    # gdf_1.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=2, color="blue")
+    # gdf_2.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=2, color="red")
+    #
+    # plt.show()
+
+    exit()
+
     if debug_one is None:
         jet_graph = {
             "dates": [],
