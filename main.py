@@ -26,6 +26,8 @@ if __name__ == "__main__":
     lines = get_all_lines("2024101900", 0, "jet")
     ico_points_ms, line_points_ms = multiscale(lines, 4)
 
+    plt.style.use("dark_background")
+
     ids = [line.id for line in lines]
     df = pd.DataFrame(ids, columns=["id"])  # type: ignore
     geometry = [LineString([coord.to_list() for coord in line.coords]) for line in lines]
@@ -34,12 +36,11 @@ if __name__ == "__main__":
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
 
-    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black") # type: ignore
-    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")   # type: ignore
-    ax.add_feature(cfeature.COASTLINE, edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.LAND, facecolor="black", edgecolor="#333333") # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="#333333")   # type: ignore
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
 
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="blue")
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), linewidth=1, color="#00bfff")
 
     geo_points = []
     for point in ico_points_ms.values():
@@ -48,6 +49,6 @@ if __name__ == "__main__":
 
     geometry = [Point(pt) for pt in geo_points]
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")
-    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=100, markersize=1)
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ff0040", zorder=100, markersize=1)
 
     plt.show()
