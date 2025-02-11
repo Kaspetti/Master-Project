@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Dict, Tuple
+from typing import List
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -10,29 +10,25 @@ from icosphere import icosphere
 from scipy.spatial import KDTree
 import numpy as np
 from numpy.typing import NDArray
-from alive_progress import alive_it
 
 @dataclass
 class IcoPoint:
     """A point on an icosphere.
 
-    Attributes
-    ----------
-    id : int 
-    The unique id of the icopoint.
-        Usually the index of the point in an array of icopoints.
-    parent_1 : int
-        Id of the first point of the edge the current point was subdivided from.
-    parent_2 : int
-        If of the second point of the edge the current point was subdivided from.
-    ms_level : int
-        The multiscale level of the icopoint
-        The level of the the initial icopoints on the sphere is 0,
-        increasing by 1 for each subdivision.
-    coord_3D : Coord3D
-        The 3D coordinate of the point.
-    coord_geo : CoordGeo
-        The longitude and latitude of the point.
+    Attributes:
+        id (int): The unique id of the icopoint.
+            Usually the index of the point in an array of icopoints.
+        parent_1 (Optional[IcoPoint]): First point of the edge
+            the current point was subdivided from.
+        parent_2 (Optional[IcoPoint]): Second point of the edge
+            the current point was subdivided from.
+        ms_level (int): The multiscale level of the icopoint
+            The level of the the initial icopoints on the sphere is 0,
+            increasing by 1 for each subdivision.
+        coord_3D (Coord3D): The 3D coordinate of the point.
+            Represented as a list of three floats: [x, y, z].
+        coord_geo (CoordGeo): The longitude and latitude of the point.
+            Represented as a list of two floats: [longitude, latitude].
     """
 
     id: int
@@ -43,26 +39,17 @@ class IcoPoint:
     parent_2: int = -1
 
 
-def inside_check(pt: NDArray[np.float64], tri: NDArray[np.float64]) -> bool:
-    """Checks if a point lies inside a triangle.
+@dataclass
+class LinePointMS:
+    id: int
+    ms_level: int
+    closest_ico_id: int
+    closest_ico_dist: float
+    line_point: int
+    line_point_coord_geo: CoordGeo
 
-    Uses barycentric coordinates to check if a point lies inside
-    the triangle formed by three other points. Expects the points to
-    be two dimensional.
 
-    Parameters
-    ----------
-    pt : NDArray[np.float64] of shape (2,)
-        The point to check if lies inside the triangle.
-    tri : NDArray[np.float64] of shape (3, 2)
-        A list of the three points making up the triangle.
-
-    Returns
-    -------
-    is_inside : bool
-        True if the point is inside, False otherwise.
-    """
-
+def inside_check(pt: NDArray[np.float_], tri: NDArray[np.float_]) -> bool:
     a = (
         (tri[1][1] - tri[2][1]) * (pt[0] - tri[2][0])
         + (tri[2][0] - tri[1][0]) * (pt[1] - tri[2][1])
@@ -82,55 +69,19 @@ def inside_check(pt: NDArray[np.float64], tri: NDArray[np.float64]) -> bool:
     return 0 <= a <= 1 and 0 <= b <= 1 and 0 <= c <= 1
 
 
-def multiscale(
-        lines: List[Line], subdivs: int
-) -> Tuple[Dict[int, IcoPoint], Dict[str, Dict[int, Dict[int, Tuple[int, float]]]]]:
-    """Performs a multiscale representation on the lines provided.
-    
-    The multiscale approach starts by representing the world as an icosphere.
-    It then subdivides this icosphere around the points on the line in order to
-    get a higher resolution only where its needed.
-
-    How many subdivisions is decided by the subdivs parameter and a representation
-    of each line on each subdivision level is also returned.
-
-    Parameters
-    ----------
-    lines : List[Line]
-        The lines to perform the multiscale around.
-    subdivs : int
-        How many subdivisions will be performed.
-
-    Returns
-    -------
-    ico_points_ms : Dict[int, IcoPoint]
-        The dicitonary of all the icopoints after subdivison.
-        The key is the same as the icopoint id.
-    line_points_ms : Dict[str, Dict[int, Dict[int, Tuple[int, float]]]]
-        A dictionary containing the representation of each line at each subdiv level.
-        The structure is as follows:
-            line_id
-                ms_level
-                    ico_point_1
-                        closest_line_point, dist
-                    ico_point_2
-                        closest_line_point, dist
-        Each ico point under the ms_level dictionary is any ico point which
-        is the closest ico point to any point in the line.
-    """
-
-    ico_verts, _ = icosphere(2)
-    ico_points_ms = {}
-    subdivided_edges = {}
-    line_points_ms = {}
+def multiscale(lines: List[Line], subdivs: int):
+    ico_verts, _ = icosphere()
+    ico_points_ms: dict[int, IcoPoint]= {}
+    subdivided_edges: dict[tuple[int, int], int] = {}
+    line_points_ms: dict[str, dict[int, dict[int, tuple[int, float]]]] = {}
 
     for i, pt in enumerate(ico_verts):
-        coord_3D = Coord3D(x=pt[0], y=pt[1], z=pt[2])
+        coord = Coord3D(x=pt[0], y=pt[1], z=pt[2])
         ico_pt = IcoPoint(
             id=i,
             ms_level=0,
-            coord_3D=coord_3D,
-            coord_geo=coord_3D.to_lon_lat()
+            coord_3D=coord,
+            coord_geo=coord.to_lon_lat()
         )
         ico_points_ms[i] = ico_pt
 
@@ -139,8 +90,7 @@ def multiscale(
 
     outside = 0
     outside_after_flip = 0
-    bar = alive_it(lines, title="Performing multiscale")
-    for line in bar:
+    for line in lines:
         line_points_ms[line.id] = {}
         for ms_level in range(0, subdivs+1):
             line_points_ms[line.id][ms_level] = {}
@@ -148,7 +98,9 @@ def multiscale(
         for i, pt in enumerate(line.coords):
             coord_3D = pt.to_3D().to_list()
 
-            closest_dists, closest_idx = ico_points_base_kd.query(coord_3D, 4)
+            closest_dists: list[float]
+            closest_idx: list[int]
+            closest_dists, closest_idx = ico_points_base_kd.query(coord_3D, 4)  # type: ignore
             closest_points = [ico_points_ms[closest_idx[0]],
                               ico_points_ms[closest_idx[1]],
                               ico_points_ms[closest_idx[2]]]
@@ -227,7 +179,7 @@ def multiscale(
                     line_points_ms[line.id][ms_level][closest_idx[0]] = (i, dist)
 
 
-    print(f"{outside} points outside and needed flipping...")
-    print(f"{outside_after_flip} points still outside after flipping...")
+    # print(f"{outside} points outside and needed flipping...")
+    # print(f"{outside_after_flip} points still outside after flipping...")
 
     return ico_points_ms, line_points_ms
