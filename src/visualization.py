@@ -12,7 +12,7 @@ import cartopy.crs as ccrs  # type: ignore
 import cartopy.feature as cfeature # type: ignore
 
 
-def plot_map(lines: list[Line], ax: Axes, ico_points: dict[int, IcoPoint] | None = None, show_ico: bool = False):
+def plot_map(lines: list[Line], ax: Axes, ico_points: dict[int, IcoPoint] | None = None, show_ico: bool = False, show_centroids: bool = False):
     ids = [line.id for line in lines]
     df = pd.DataFrame(ids, columns=["id"])  
     geometry = [LineString([coord.to_list() for coord in line.coords]) for line in lines]
@@ -26,16 +26,20 @@ def plot_map(lines: list[Line], ax: Axes, ico_points: dict[int, IcoPoint] | None
     if show_ico:
         if not ico_points:
             print("'show_ico' was set to True for 'plot_map' but 'ico_points' was not set")
-            return
+        else:
+            geo_points = []
+            for point in ico_points.values():
+                n = point.coord_3D.to_ndarray() / np.linalg.norm(point.coord_3D.to_ndarray())
+                geo_points.append(Coord3D(n[0], n[1], n[2]).to_lon_lat().to_list())
 
-        geo_points = []
-        for point in ico_points.values():
-            n = point.coord_3D.to_ndarray() / np.linalg.norm(point.coord_3D.to_ndarray())
-            geo_points.append(Coord3D(n[0], n[1], n[2]).to_lon_lat().to_list())
+            geometry = [Point(pt) for pt in geo_points]
+            gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ff0000", zorder=100, markersize=1)
 
-        geometry = [Point(pt) for pt in geo_points]
+    if show_centroids:
+        geometry = [Point(line.get_centroid().to_list()) for line in lines]
         gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
-        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ff0000", zorder=100, markersize=1)
+        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#00ff00", zorder=101, markersize=2)
 
 
 def plot_3D(lines: list[Line], ax: Axes, ico_points: dict[int, IcoPoint] | None = None, show_ico: bool = False):

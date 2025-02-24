@@ -25,6 +25,7 @@ import cartopy.crs as ccrs  # type: ignore
 class Settings:
     show_ico_points: bool
     show_3D_vis: bool
+    show_centroids: bool
 
     sim_start: str
     time_offset: int
@@ -47,10 +48,12 @@ def init() -> tuple[Settings, Data]:
     parser.add_argument("--simstart", type=str, default="2025021100", help="Start of the simulation in the format 'YYYYMMDDHH'")
     parser.add_argument("--timeoffset", type=int, default=0, choices=valid_timeoffsets, help="Time offset from the simstart")
     parser.add_argument("--linetype", type=str, default="jet", choices=["jet", "mta"], help="Type of line (must be 'jet' or 'mta')")
+    parser.add_argument("--centroids", action="store_true", help="Show centroids of lines")
 
     args = parser.parse_args()
     settings = Settings(show_3D_vis=args.sphere,
                         show_ico_points=args.ico,
+                        show_centroids=args.centroids,
                         sim_start=args.simstart,
                         time_offset=args.timeoffset,
                         line_type=args.linetype)
@@ -78,7 +81,7 @@ if __name__ == "__main__":
     else:
         ax1 = fig.add_subplot(111, projection=ccrs.PlateCarree())
 
-    plot_map(data.lines, ax1, data.ico_points_ms, settings.show_ico_points)
+    plot_map(data.lines, ax1, data.ico_points_ms, settings.show_ico_points, settings.show_centroids)
 
     plt.tight_layout()
     plt.show()
