@@ -11,6 +11,7 @@ line starting points being shifted.
 
 from dataclasses import dataclass
 import argparse
+from typing import Literal
 
 from coords import Coord3D
 from line_reader import Line, get_all_lines
@@ -30,6 +31,10 @@ import cartopy.feature as cfeature # type: ignore
 class Settings:
     show_ico_points: bool
     show_3D_vis: bool
+
+    sim_start: str
+    time_offset: int
+    line_type: Literal["jet", "mta"]
 
 
 @dataclass
@@ -92,14 +97,23 @@ def plot_3D(lines: list[Line], ax: Axes, ico_points: dict[int, IcoPoint] | None 
 
 
 def init() -> tuple[Settings, Data]:
+    valid_timeoffsets = list(range(0, 73, 3)) + list(range(78, 241, 6))
+ 
     parser = argparse.ArgumentParser("MTA and Jet lines ensemble vizualizer")
     parser.add_argument("--sphere", action="store_true", help="Show 3D visualization")
     parser.add_argument("--ico", action="store_true", help="Show IcoPoints on map and 3D visualization")
+    parser.add_argument("--simstart", type=str, default="2025021100", help="Start of the simulation in the format 'YYYYMMDDHH'")
+    parser.add_argument("--timeoffset", type=int, default=0, choices=valid_timeoffsets, help="Time offset from the simstart")
+    parser.add_argument("--linetype", type=str, default="jet", choices=["jet", "mta"], help="Type of line (must be 'jet' or 'mta')")
 
     args = parser.parse_args()
-    settings = Settings(show_3D_vis=args.sphere, show_ico_points=args.ico)
+    settings = Settings(show_3D_vis=args.sphere,
+                        show_ico_points=args.ico,
+                        sim_start=args.simstart,
+                        time_offset=args.timeoffset,
+                        line_type=args.linetype)
 
-    lines = get_all_lines("2025021100", 72, "jet")
+    lines = get_all_lines(settings.sim_start, settings.time_offset, settings.line_type)
     ico_points_ms, line_points_ms = multiscale(lines, 4)
     data = Data(lines=lines, ico_points_ms=ico_points_ms, line_points_ms=line_points_ms)
 
