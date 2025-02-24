@@ -13,6 +13,11 @@ if typ not in {"mta", "jet"}:
     exit()
 
 
+manual_date = None
+if len(sys.argv) >= 3:
+    manual_date = sys.argv[2]
+
+
 def filename(x, d):
     if typ == "jet":
         return f"ec.ens_{x}.{d}.pv2000.jetaxis.nc"
@@ -21,6 +26,9 @@ def filename(x, d):
 
 
 dates = ["2024101900"]
+
+if manual_date:
+    dates = [manual_date]
 
 
 for date in dates:

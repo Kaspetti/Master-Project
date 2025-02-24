@@ -70,7 +70,7 @@ def inside_check(pt: NDArray[np.float_], tri: NDArray[np.float_]) -> bool:
 
 
 def multiscale(lines: List[Line], subdivs: int):
-    ico_verts, _ = icosphere()
+    ico_verts, _ = icosphere(0)
     ico_points_ms: dict[int, IcoPoint]= {}
     subdivided_edges: dict[tuple[int, int], int] = {}
     line_points_ms: dict[str, dict[int, dict[int, tuple[int, float]]]] = {}

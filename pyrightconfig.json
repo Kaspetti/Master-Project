@@ -1,0 +1,25 @@
+{
+  "typeCheckingMode": "standard",
+
+  "exclude": [
+    "**/site-packages/**",
+    "**/venv/**",        
+    "**/tests/**",      
+    "**/scripts/**"    
+  ],
+
+  "include": [
+    "src",                 
+  ],
+
+  "pythonVersion": "3.11.2",
+
+  "pythonPlatform": "Linux",
+
+  "useLibraryCodeForTypes": true,  
+
+  "ignore": [
+      "geopandas",
+      "cartopy"
+  ]
+}
