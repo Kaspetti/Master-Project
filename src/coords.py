@@ -37,6 +37,28 @@ class Coord3D:
         self.y = y
         self.z = z
 
+    def __add__(self, o: Coord3D) -> Coord3D:
+        """Performs element wise addition on a Coord3D.
+        
+        Parameters
+        ----------
+        o : Coord3D
+            The coordinate to add to the coordinate.
+
+        Returns
+        -------
+        a : Coord3D
+            o added to the coordinate.
+            A new coordinate with the elements of o added to the
+            elements of the coordinate.
+        """
+
+        return Coord3D(
+            x=self.x + o.x,
+            y=self.y + o.y,
+            z=self.z + o.z
+        )
+
     def __sub__(self, o: Coord3D) -> Coord3D:
         """Performs element wise subtraction on a Coord3D.
         
@@ -76,6 +98,25 @@ class Coord3D:
             x=self.x * s,
             y=self.y * s,
             z=self.z * s
+        )
+
+    def __div__(self, s: int | float) -> Coord3D:
+        """Performs a scalar division on a Coord3D.
+
+        Parameters
+        ----------
+        s : int | float
+            The scalar to divide by.
+
+        Returns
+        -------
+        a : Coord3D
+            The coordinate divided by s.
+        """
+        return Coord3D(
+            x=self.x / s,
+            y=self.y / s,
+            z=self.z / s
         )
 
     def __str__(self) -> str:
