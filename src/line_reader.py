@@ -1,7 +1,7 @@
 from typing import Literal, List
 from dataclasses import dataclass
 
-from coords import CoordGeo
+from coords import Coord3D, CoordGeo
 
 import numpy as np
 import xarray as xr
@@ -26,6 +26,14 @@ class Line:
 
     id: str
     coords: List[CoordGeo]
+
+
+    def get_centroid(self) -> CoordGeo:
+        cs3D = Coord3D(0, 0, 0)
+        for coord in self.coords:
+            cs3D += coord.to_3D()
+
+        return (cs3D.__div__(len(self.coords))).to_lon_lat()
 
 
 def get_all_lines(
