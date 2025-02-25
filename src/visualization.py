@@ -48,25 +48,19 @@ def plot_3D(data: Data, settings: Settings, ax: Axes):
 
     ax.plot_wireframe(x, y, z, color='gray', alpha=0.3)    # type: ignore
 
-    for line in data.lines:
-        xs = [coord.to_3D().x for coord in line.coords]
-        ys = [coord.to_3D().y for coord in line.coords]
-        zs = [coord.to_3D().z for coord in line.coords]
-        ax.plot(xs, ys, zs, color="#053a8d")
+    plot_lines_3D(data.lines, ax)
+    if data.lines_2:
+        plot_lines_3D(data.lines_2, ax, 1)
 
     if settings.show_ico_points:
-        xs = [pt.coord_3D.x for pt in data.ico_points_ms.values()] 
-        ys = [pt.coord_3D.y for pt in data.ico_points_ms.values()] 
-        zs = [pt.coord_3D.z for pt in data.ico_points_ms.values()] 
-        ax.scatter(xs, ys, zs, color="#0b9dce")
+        plot_ico_points_3D(data.ico_points_ms, ax)
+        if data.ico_points_ms_2:
+            plot_ico_points_3D(data.ico_points_ms_2, ax, 1)
 
     if settings.show_centroids:
-        centroids = [line.get_centroid().to_3D() for line in data.lines]
-        xs = [centroid.x for centroid in centroids]
-        ys = [centroid.y for centroid in centroids]
-        zs = [centroid.z for centroid in centroids]
-
-        ax.scatter(xs, ys, zs, color="#ff872e")
+        plot_centroids_3D(data.lines, ax)
+        if data.lines_2:
+            plot_centroids_3D(data.lines_2, ax, 1)
 
 
 def plot_lines_map(lines: list[Line], ax: Axes, group: Literal[0, 1] = 0):
@@ -122,3 +116,27 @@ def add_legend_map(data: Data, settings: Settings, ax: Axes):
     
     ax.legend(handles=legend_elements, loc='lower left', frameon=True, framealpha=0.9,
               fontsize=8, title='Map Elements')
+
+
+def plot_lines_3D(lines: list[Line], ax: Axes, group: Literal[0, 1] = 0):
+    for line in lines:
+        xs = [coord.to_3D().x for coord in line.coords]
+        ys = [coord.to_3D().y for coord in line.coords]
+        zs = [coord.to_3D().z for coord in line.coords]
+        ax.plot(xs, ys, zs, color="#053a8d" if group == 0 else "#098945")
+
+
+def plot_ico_points_3D(ico_points_ms: dict[int, IcoPoint], ax: Axes, group: Literal[0, 1] = 0):
+    xs = [pt.coord_3D.x for pt in ico_points_ms.values()] 
+    ys = [pt.coord_3D.y for pt in ico_points_ms.values()] 
+    zs = [pt.coord_3D.z for pt in ico_points_ms.values()] 
+    ax.scatter(xs, ys, zs, color="#0b9dce" if group == 0 else "#83bf1c")
+
+
+def plot_centroids_3D(lines: list[Line], ax: Axes, group: Literal[0, 1] = 0):
+    centroids = [line.get_centroid().to_3D() for line in lines]
+    xs = [centroid.x for centroid in centroids]
+    ys = [centroid.y for centroid in centroids]
+    zs = [centroid.z for centroid in centroids]
+
+    ax.scatter(xs, ys, zs, color="#ff872e" if group == 0 else "#ffbf00")
