@@ -77,7 +77,7 @@ if __name__ == "__main__":
         ax2.set_ylabel('Y')
         ax2.set_zlabel('Z') # type: ignore
 
-        plot_3D(data.lines, ax2, data.ico_points_ms, settings.show_ico_points)
+        plot_3D(data.lines, ax2, data.ico_points_ms, settings.show_ico_points, settings.show_centroids)
     else:
         ax1 = fig.add_subplot(111, projection=ccrs.PlateCarree())
 
