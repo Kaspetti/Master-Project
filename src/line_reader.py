@@ -90,6 +90,7 @@ def get_all_lines(
         full_path = base_path + file_path
 
         ds = xr.open_dataset(full_path)
+        
         date_ds = ds.where(
             ds.date == start_time + np.timedelta64(time_offset, "h"), drop=True
         )

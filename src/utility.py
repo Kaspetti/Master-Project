@@ -15,6 +15,8 @@ class Settings:
     time_offset: int
     line_type: Literal["jet", "mta"]
 
+    oneline: int
+
 
 @dataclass
 class Data:
