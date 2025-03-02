@@ -12,6 +12,7 @@ line starting points being shifted.
 import argparse
 
 from download_ens import download
+from fitting import fit_lines_spline, fit_spline
 from line_reader import get_all_lines
 from multiscale import multiscale
 from utility import Data, Settings
@@ -32,6 +33,7 @@ def init() -> tuple[Settings, Data]:
     parser.add_argument("--linetype", type=str, default="jet", choices=["jet", "mta", "both"], help="Type of line (must be 'jet', 'mta', or 'both')")
     parser.add_argument("--centroids", action="store_true", help="Show centroids of lines")
     parser.add_argument("--oneline", type=int, default=-1, help="If this is set only one line will be visualized. The number provided is the index of that line")
+    parser.add_argument("--bspline", action="store_true", help="Approximate all lines with a BSpline")
 
     args = parser.parse_args()
     settings = Settings(show_3D_vis=args.sphere,
@@ -40,7 +42,8 @@ def init() -> tuple[Settings, Data]:
                         sim_start=args.simstart,
                         time_offset=args.timeoffset,
                         line_type=args.linetype,
-                        oneline=args.oneline)
+                        oneline=args.oneline,
+                        bspline=args.bspline)
 
     if settings.line_type != "both":
         download(settings.sim_start, args.linetype)
@@ -48,6 +51,10 @@ def init() -> tuple[Settings, Data]:
         print("Processing lines")
         lines = get_all_lines(settings.sim_start, settings.time_offset, settings.line_type)
         ico_points_ms, line_points_ms = multiscale(lines, 4)
+
+        if settings.bspline:
+            lines = fit_lines_spline(lines)
+
         data = Data(lines=lines, ico_points_ms=ico_points_ms, line_points_ms=line_points_ms)
     else:
         download(settings.sim_start, "jet") 
@@ -60,6 +67,10 @@ def init() -> tuple[Settings, Data]:
         print("Processing lines 2")
         lines_2 = get_all_lines(settings.sim_start, settings.time_offset, "mta")
         ico_points_ms_2, line_points_ms_2 = multiscale(lines_2, 4)
+
+        if settings.bspline:
+            lines = fit_lines_spline(lines)
+            lines_2 = fit_lines_spline(lines_2)
 
         data = Data(lines=lines,
                     ico_points_ms=ico_points_ms,
@@ -79,8 +90,14 @@ if __name__ == "__main__":
 
     if settings.oneline != -1:
         line = data.lines[settings.oneline]
+
         ax1 = fig.add_subplot(111, projection="3d")
+
+        fitted_points = fit_spline(line)
         plot_single_line(line, ax1)
+
+        ax1.plot(fitted_points[0], fitted_points[1], fitted_points[2])
+
         plt.tight_layout()
         plt.show()
         exit()

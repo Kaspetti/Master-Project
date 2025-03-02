@@ -16,6 +16,7 @@ class Settings:
     line_type: Literal["jet", "mta"]
 
     oneline: int
+    bspline: bool
 
 
 @dataclass
