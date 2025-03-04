@@ -11,15 +11,25 @@ line starting points being shifted.
 
 import argparse
 
+from pyproj import transform
+from shapely.geometry import LineString
+
+from coords import Coord3D
+from desc_stats import total_distance_from_median
 from download_ens import download
 from fitting import fit_lines_spline, fit_spline
-from line_reader import get_all_lines
+from line_reader import Line, dateline_fix, get_all_lines
 from multiscale import multiscale
-from utility import Data, Settings
+from utility import Data, Settings, load_networks
 from visualization import get_legend_elements, plot_map, plot_3D, plot_single_line
 
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs  # type: ignore
+import numpy as np
+from numpy.typing import NDArray
+import pandas as pd
+import geopandas as gpd
+import cartopy.feature as cfeature
 
 
 def init() -> tuple[Settings, Data]:
@@ -83,9 +93,7 @@ def init() -> tuple[Settings, Data]:
     return settings, data
 
 
-if __name__ == "__main__":
-    settings, data = init()
-
+def main(settings: Settings, data: Data):
     fig = plt.figure(figsize=(16, 9))
 
     if settings.oneline != -1:
@@ -96,7 +104,7 @@ if __name__ == "__main__":
         fitted_points = fit_spline(line)
         plot_single_line(line, ax1)
 
-        ax1.plot(fitted_points[0], fitted_points[1], fitted_points[2])
+        ax1.plot(fitted_points[0], fitted_points[1], fitted_points[2])  # type: ignore
 
         plt.tight_layout()
         plt.show()
@@ -123,3 +131,58 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     plt.show()
+
+
+def testing(settings: Settings, data: Data):
+    networks = load_networks("networks.json")
+    dist_threshold = 50
+    dist_ratio = 0.05
+    
+    key = settings.sim_start + str(settings.time_offset) + str(dist_threshold) + str(dist_ratio) + settings.line_type
+    node_clusters = networks[key]["node_clusters"]
+
+    largest_cluster = int(max(networks[key]["clusters"], key=lambda k: len(networks[key]["clusters"][k])))
+    line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
+    lines = [line for line in data.lines if line.id in line_ids]
+    
+    splines: dict[str, tuple[NDArray, NDArray]] = {}
+    for line in lines:
+        fitted_points, coeffs = fit_spline(line) 
+        splines[line.id] = (fitted_points, coeffs)
+
+    coeffs = np.array([coeffs for (_, coeffs) in splines.values()])
+    median_coeffs = np.median(coeffs, axis=0)
+
+    distances: dict[str, float] = {}
+    for line_id, (_, coeffs) in splines.items():
+        distances[line_id] = total_distance_from_median(coeffs, median_coeffs)
+
+    avg_dist = sum(distances.values()) / len(distances)
+
+    central_line = min(distances, key=lambda k: distances[k])
+    fig = plt.figure(figsize=(16, 9))
+
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    for line in lines:
+        geometry = [LineString([coord.to_list() for coord in line.coords])]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+
+        if line.id == central_line:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ff872e", zorder=2, linewidth=4)
+        elif distances[line.id] > avg_dist * 2:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ec000b", zorder=1, linewidth=2, linestyle=":")
+        else:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":
+    settings, data = init()
+    # main(settings, data)
+    testing(settings, data)

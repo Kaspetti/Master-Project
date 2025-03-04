@@ -1,5 +1,7 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, TypedDict
+
+from cartopy.crs import json
 
 from line_reader import Line
 from multiscale import IcoPoint
@@ -28,3 +30,33 @@ class Data:
     lines_2: list[Line] | None = None
     ico_points_ms_2: dict[int, IcoPoint] | None = None
     line_points_ms_2: dict[str, dict[int, dict[int, tuple[int, float]]]] | None = None
+
+
+@dataclass(frozen=True)
+class Connection:
+    source: str
+    target: str
+    weight: float
+
+
+class TypedConnection(TypedDict):
+    source: str
+    target: str
+    weight: float
+
+
+class Node(TypedDict):
+    id: str
+
+
+class Network(TypedDict):
+    nodes: list[Node]
+    clusters: dict[int, list[TypedConnection]]
+    node_clusters: dict[str, int]
+
+
+
+def load_networks(path: str) -> dict[str, Network]:
+    with open(path, "r") as f:
+        networks: dict[str, Network] = json.load(f)
+        return networks
