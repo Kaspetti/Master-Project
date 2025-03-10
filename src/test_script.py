@@ -15,7 +15,52 @@ import numpy as np
 from kneed import KneeLocator
 
 
-def test_bezier(settings: Settings, data: Data):
+def test_bezier_desc_stats(settings: Settings, data: Data):
+    networks = load_networks("networks.json")
+    dist_threshold = 50
+    dist_ratio = 0.05
+    
+    key = settings.sim_start + str(settings.time_offset) + str(dist_threshold) + str(dist_ratio) + settings.line_type
+    node_clusters = networks[key]["node_clusters"]
+
+    largest_cluster = int(max(networks[key]["clusters"], key=lambda k: len(networks[key]["clusters"][k])))
+    line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
+    lines = [line for line in data.lines if line.id in line_ids]
+
+    splines = fit_bezier_all(lines)
+    coeffs = [cs for cs, _, _ in splines.values()]
+    median_coeffs = np.median(coeffs, axis=0)
+
+    distances: dict[str, float] = {}
+    for line_id, (cs, _, _) in splines.items():
+        distances[line_id] = total_distance_from_median(cs, median_coeffs)
+
+    avg_dist = sum(distances.values()) / len(distances)
+
+    central_line = min(distances, key=lambda k: distances[k])
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    for line in lines:
+        geometry = [LineString([coord.to_list() for coord in line.coords])]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+
+        if line.id == central_line:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ff872e", zorder=2, linewidth=4)
+        elif distances[line.id] > avg_dist * 2:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ec000b", zorder=1, linewidth=2, linestyle=":")
+        else:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def test_bezier_all(settings: Settings, data: Data):
     splines = fit_bezier_all(data.lines, True)
 
     fig = plt.figure(figsize=(16, 9))
@@ -25,7 +70,7 @@ def test_bezier(settings: Settings, data: Data):
     ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
     ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
 
-    for _, pts, _, in splines:
+    for _, (_, pts, _) in splines.items():
         coords = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat() for pt in pts]
         max_lon = max(coords, key=lambda c: c.lon).lon
         min_lon = min(coords, key=lambda c: c.lon).lon
@@ -149,13 +194,6 @@ def test_bspline_all(settings: Settings, data: Data):
     largest_cluster = int(max(networks[key]["clusters"], key=lambda k: len(networks[key]["clusters"][k])))
     line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
     lines = [line for line in data.lines if line.id in line_ids]
-
-    fig = plt.figure(figsize=(16, 9))
-
-    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
-    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
-    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
-    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
 
     splines: dict[str, tuple[NDArray, NDArray]] = {}
     for line in lines:

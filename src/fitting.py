@@ -36,12 +36,12 @@ def fit_spline(line: Line) -> tuple[NDArray, NDArray]:
     return new_points, spl.c
 
 
-def fit_bezier_all(lines: list[Line], get_points: bool = False) -> list[tuple[NDArray, NDArray, float]]:
+def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tuple[NDArray, NDArray, float]]:
     max_degree = 0
     for line in lines:
         errs: dict[int, float] = {}
         for i in range(2, 10):
-            _, _, err = fit_bezier(line, i, True)
+            _, _, err = fit_bezier(line, i, False)
             errs[i] = err
 
         x = list(errs.keys())
@@ -54,7 +54,8 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> list[tuple[ND
 
         max_degree = max(max_degree, elbow)
 
-    return [fit_bezier(line, max_degree, get_points) for line in lines]
+    print(f"Fit bezier splines of degree: {max_degree}")
+    return {line.id: fit_bezier(line, max_degree, get_points) for line in lines}
 
 
 def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArray, NDArray, float]:
