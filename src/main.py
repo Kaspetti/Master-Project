@@ -127,8 +127,17 @@ def main(settings: Settings, data: Data):
 if __name__ == "__main__":
     settings, data = init()
     print("Initialized")
-    # testing.test_bspline_all(settings, data)
+    
+
+    testing.test_bezier_single(settings, data)
+    testing.test_bezier_error(settings, data)
     testing.test_bezier_desc_stats(settings, data)
+
+    testing.test_bspline_all(settings, data)
+    testing.test_bezier_all(settings, data)
+
+    # testing.test_bspline_all(settings, data)
+    # testing.test_bezier_desc_stats(settings, data)
     # testing.test_bezier_all(settings, data)
     # testing.test_bezier_error(settings, data)
     # testing.test_bezier_all(settings, data)

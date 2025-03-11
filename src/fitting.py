@@ -40,7 +40,7 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tup
     max_degree = 0
     for line in lines:
         errs: dict[int, float] = {}
-        for i in range(2, 10):
+        for i in range(3, 11):
             _, _, err = fit_bezier(line, i, False)
             errs[i] = err
 

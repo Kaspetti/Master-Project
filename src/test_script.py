@@ -1,3 +1,4 @@
+from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 from shapely.geometry import LineString
 from coords import Coord3D
@@ -56,6 +57,15 @@ def test_bezier_desc_stats(settings: Settings, data: Data):
         else:
             gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
 
+    
+    legend_elements = []
+    legend_elements.append(Line2D([0], [0], color='#ff872e', lw=4, label="Central Line"))
+    legend_elements.append(Line2D([0], [0], color='#ec000b', lw=2, ls=":", label="Outliers"))
+    legend_elements.append(Line2D([0], [0], color='#053a8d', lw=1, label="Jet Lines"))
+
+    ax.legend(handles=legend_elements)
+
+    plt.title(label="Jet Lines with center and outliers (calculated using Bezier control points)")
     plt.tight_layout()
     plt.show()
 
@@ -81,6 +91,8 @@ def test_bezier_all(settings: Settings, data: Data):
         gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
         gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
 
+    degree = len(splines[list(splines.keys())[0]][0]) - 1
+    plt.title(label=f"Bezier Curve representation of Jet Lines (degree: {degree})")
     plt.tight_layout()
     plt.show()
 
@@ -97,10 +109,9 @@ def test_bezier_error(settings: Settings, data: Data):
     line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
     lines = [line for line in data.lines if line.id in line_ids]
 
-    max_degree = 0
     for line in lines:
         errs: dict[int, float] = {}
-        for i in range(2, 10):
+        for i in range(3, 11):
             _, _, err = fit_bezier(line, i, True)
             errs[i] = err
 
@@ -112,35 +123,10 @@ def test_bezier_error(settings: Settings, data: Data):
             print("Couldn't find elbow")
             continue
 
-        max_degree = max(max_degree, elbow)
+        plt.plot(x, y)
 
-    print(f"Decided on degree: {max_degree}")
-    splines = [fit_bezier(line, max_degree, True) for line in lines]
-    
-    fig = plt.figure(figsize=(16, 9))
-
-    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
-    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
-    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
-    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
-
-    for cs, pts, _  in splines:
-        if len(pts) == 0:
-            continue
-
-        geometry = [LineString([Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in pts])]
-        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
-        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
-
-    for line in lines:
-        geometry = [LineString([coord.to_list() for coord in line.coords])]
-        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
-        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ec000b", zorder=0, linewidth=1, linestyle=":")
-        
+    plt.title(label="Errors of all Bezier Curves from 3rd to 10th degree")
     plt.tight_layout()
-    plt.show()
-
-
     plt.show()
 
 
@@ -179,6 +165,12 @@ def test_bezier_single(settings: Settings, data: Data):
         gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
         gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#ec000b", zorder=0, linewidth=1, linestyle=":")
         
+    legend_elements = []
+    legend_elements.append(Line2D([0], [0], color='#053a8d', lw=1, label="Bezier Curves"))
+    legend_elements.append(Line2D([0], [0], color='#ec000b', lw=1, ls=":", label="Jet Lines"))
+
+    ax.legend(handles=legend_elements)
+    plt.title(label="Jet lines and their 3rd degree Bezier Curves")
     plt.tight_layout()
     plt.show()
 
@@ -228,5 +220,13 @@ def test_bspline_all(settings: Settings, data: Data):
         else:
             gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
 
+    legend_elements = []
+    legend_elements.append(Line2D([0], [0], color='#ff872e', lw=4, label="Central Line"))
+    legend_elements.append(Line2D([0], [0], color='#ec000b', lw=2, ls=":", label="Outliers"))
+    legend_elements.append(Line2D([0], [0], color='#053a8d', lw=1, label="Jet Lines"))
+
+    ax.legend(handles=legend_elements)
+
+    plt.title(label="Jet Lines with center and outliers (calculated using B-Spline coefficients)")
     plt.tight_layout()
     plt.show()
