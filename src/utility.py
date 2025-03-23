@@ -15,7 +15,7 @@ class Settings:
 
     sim_start: str
     time_offset: int
-    line_type: Literal["jet", "mta"]
+    line_type: Literal["jet", "mta", "both"]
 
     oneline: int
     bspline: bool

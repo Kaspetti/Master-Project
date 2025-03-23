@@ -69,7 +69,7 @@ def plot_lines_map(lines: list[Line], ax: Axes, group: Literal[0, 1] = 0):
 
 
 def plot_ico_points_map(ico_points_ms: dict[int, IcoPoint], ax: Axes, group: Literal[0, 1] = 0):
-    geo_points = []
+    geo_points: list[list[float]] = []
     for point in ico_points_ms.values():
         n = point.coord_3D.to_ndarray() / np.linalg.norm(point.coord_3D.to_ndarray())
         geo_points.append(Coord3D(n[0], n[1], n[2]).to_lon_lat().to_list())
@@ -112,7 +112,7 @@ def plot_centroids_3D(lines: list[Line], ax: Axes, group: Literal[0, 1] = 0):
 def get_legend_elements(data: Data, settings: Settings) -> list[Line2D]:
     group_1_name = settings.line_type if settings.line_type != "both" else "jet"
 
-    legend_elements = []
+    legend_elements: list[Line2D] = []
     
     legend_elements.append(Line2D([0], [0], color='#053a8d', lw=2, label=f"Lines {group_1_name}"))
     

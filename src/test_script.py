@@ -2,7 +2,7 @@ from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 from shapely.geometry import LineString
 from coords import Coord3D
-from desc_stats import total_distance_from_median
+from desc_stats import standard_deviation, total_distance_from_median
 from fitting import fit_bezier, fit_bezier_all, fit_spline
 from line_reader import dateline_fix
 from utility import Data, Settings, load_networks
@@ -14,6 +14,47 @@ import geopandas as gpd
 import cartopy.feature as cfeature
 import numpy as np
 from kneed import KneeLocator
+
+
+def test_bezier_cluster(settings: Settings, data: Data):
+    networks = load_networks("networks.json")
+    dist_threshold = 50
+    dist_ratio = 0.05
+    
+    key = settings.sim_start + str(settings.time_offset) + str(dist_threshold) + str(dist_ratio) + settings.line_type
+    node_clusters = networks[key]["node_clusters"]
+
+    largest_cluster = int(max(networks[key]["clusters"], key=lambda k: len(networks[key]["clusters"][k])))
+    line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
+    lines = [line for line in data.lines if line.id in line_ids]
+
+    splines = fit_bezier_all(lines)
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection="3d")
+    colors = ["#053a8d", "#0b9dce", "#098945", "#83bf1c", "#ec000b", "#ff872e", "#7b45b5", "#d883fc", "#a45700", "#ffbf00"]
+
+    for line in lines:
+        coords_3d = np.array([coord.to_3D().to_list() for coord in line.coords])
+        plt.plot(coords_3d[:, 0], coords_3d[:, 1], coords_3d[:, 2], c="blue")
+
+    for i in range(len(splines[list(splines.keys())[0]][0])):
+        coeffs = np.array([cs[i] for cs, _, _ in splines.values()])
+        sd, centroid = standard_deviation(coeffs)
+
+        ax.scatter(coeffs[:, 0], coeffs[:, 1], coeffs[:, 2], c=colors[i], alpha=0.5)
+
+        u = np.linspace(0, 2 * np.pi, 10)
+        v = np.linspace(0, np.pi, 10)
+        x = sd[0] * np.outer(np.cos(u), np.sin(v)) + centroid[0]
+        y = sd[1] * np.outer(np.sin(u), np.sin(v)) + centroid[1]
+        z = sd[2] * np.outer(np.ones(np.size(u)), np.cos(v)) + centroid[2]
+
+        ax.plot_surface(x, y, z, alpha=0.25, color=colors[i])
+
+    plt.tight_layout()
+    plt.show()
+
 
 
 def test_bezier_desc_stats(settings: Settings, data: Data):
@@ -57,7 +98,6 @@ def test_bezier_desc_stats(settings: Settings, data: Data):
         else:
             gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#053a8d", zorder=0, linewidth=1)
 
-    
     legend_elements = []
     legend_elements.append(Line2D([0], [0], color='#ff872e', lw=4, label="Central Line"))
     legend_elements.append(Line2D([0], [0], color='#ec000b', lw=2, ls=":", label="Outliers"))
@@ -187,7 +227,7 @@ def test_bspline_all(settings: Settings, data: Data):
     line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
     lines = [line for line in data.lines if line.id in line_ids]
 
-    splines: dict[str, tuple[NDArray, NDArray]] = {}
+    splines: dict[str, tuple[NDArray[np.float64], NDArray[np.float64]]] = {}
     for line in lines:
         fitted_points, coeffs = fit_spline(line) 
         splines[line.id] = (fitted_points, coeffs)

@@ -1,25 +1,27 @@
 {
-  "typeCheckingMode": "standard",
-
+  "typeCheckingMode": "strict",
+  "useLibraryCodeForTypes": true,
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownParameterType": false,
+  "reportMissingTypeArgument": true,
+  "reportInvalidTypeVarUse": true,
+  "reportCallInDefaultInitializer": true,
+  "reportUntypedFunctionDecorator": true,
+  "reportUntypedClassDecorator": true,
+  "reportUntypedBaseClass": true,
+  "reportUntypedNamedTuple": true,
+  "reportFunctionMemberAccess": true,
+  "pythonVersion": "3.10",
   "exclude": [
-    "**/site-packages/**",
-    "**/venv/**",        
-    "**/tests/**",      
-    "**/scripts/**"    
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.*"
   ],
-
-  "include": [
-    "src",                 
-  ],
-
-  "pythonVersion": "3.11.2",
-
-  "pythonPlatform": "Linux",
-
-  "useLibraryCodeForTypes": true,  
-
-  "ignore": [
-      "geopandas",
-      "cartopy"
-  ]
+  "venvPath": ".",
+  "venv": ".venv"
 }
+

@@ -27,14 +27,14 @@ def init() -> tuple[Settings, Data]:
     valid_timeoffsets = list(range(0, 73, 3)) + list(range(78, 241, 6))
  
     parser = argparse.ArgumentParser("MTA and Jet lines ensemble vizualizer")
-    parser.add_argument("--sphere", action="store_true", help="Show 3D visualization")
-    parser.add_argument("--ico", action="store_true", help="Show IcoPoints on map and 3D visualization")
-    parser.add_argument("--simstart", type=str, default="2025021100", help="Start of the simulation in the format 'YYYYMMDDHH'")
-    parser.add_argument("--timeoffset", type=int, default=0, choices=valid_timeoffsets, help="Time offset from the simstart")
-    parser.add_argument("--linetype", type=str, default="jet", choices=["jet", "mta", "both"], help="Type of line (must be 'jet', 'mta', or 'both')")
-    parser.add_argument("--centroids", action="store_true", help="Show centroids of lines")
-    parser.add_argument("--oneline", type=int, default=-1, help="If this is set only one line will be visualized. The number provided is the index of that line")
-    parser.add_argument("--bspline", action="store_true", help="Approximate all lines with a BSpline")
+    _ = parser.add_argument("--sphere", action="store_true", help="Show 3D visualization")
+    _ = parser.add_argument("--ico", action="store_true", help="Show IcoPoints on map and 3D visualization")
+    _ = parser.add_argument("--simstart", type=str, default="2025021100", help="Start of the simulation in the format 'YYYYMMDDHH'")
+    _ = parser.add_argument("--timeoffset", type=int, default=0, choices=valid_timeoffsets, help="Time offset from the simstart")
+    _ = parser.add_argument("--linetype", type=str, default="jet", choices=["jet", "mta", "both"], help="Type of line (must be 'jet', 'mta', or 'both')")
+    _ = parser.add_argument("--centroids", action="store_true", help="Show centroids of lines")
+    _ = parser.add_argument("--oneline", type=int, default=-1, help="If this is set only one line will be visualized. The number provided is the index of that line")
+    _ = parser.add_argument("--bspline", action="store_true", help="Approximate all lines with a BSpline")
 
     args = parser.parse_args()
     settings = Settings(show_3D_vis=args.sphere,
@@ -127,18 +127,7 @@ def main(settings: Settings, data: Data):
 if __name__ == "__main__":
     settings, data = init()
     print("Initialized")
-    
+   
+    testing.test_bezier_cluster(settings, data)
 
-    testing.test_bezier_single(settings, data)
-    testing.test_bezier_error(settings, data)
-    testing.test_bezier_desc_stats(settings, data)
-
-    testing.test_bspline_all(settings, data)
-    testing.test_bezier_all(settings, data)
-
-    # testing.test_bspline_all(settings, data)
-    # testing.test_bezier_desc_stats(settings, data)
-    # testing.test_bezier_all(settings, data)
-    # testing.test_bezier_error(settings, data)
-    # testing.test_bezier_all(settings, data)
     # main(settings, data)

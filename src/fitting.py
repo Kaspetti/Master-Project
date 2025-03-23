@@ -3,13 +3,14 @@ from coords import Coord3D
 from line_reader import Line, dateline_fix
 
 from numpy.typing import NDArray
-from scipy.interpolate import make_splprep
+from scipy.interpolate import BSpline, make_splprep  # type: ignore
+
 import numpy as np
 from kneed import KneeLocator
 
 
 def fit_lines_spline(lines: list[Line]) -> list[Line]:
-    new_lines = [] 
+    new_lines: list[Line] = [] 
 
     for line in lines:
         xyz, _ = fit_spline(line)
@@ -24,19 +25,19 @@ def fit_lines_spline(lines: list[Line]) -> list[Line]:
     return new_lines
 
 
-def fit_spline(line: Line) -> tuple[NDArray, NDArray]:
+def fit_spline(line: Line) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     coords_3D = [coord.to_3D() for coord in line.coords]
     xs = [coord.x for coord in coords_3D]
     ys = [coord.y for coord in coords_3D]
     zs = [coord.z for coord in coords_3D]
 
-    spl, _ = make_splprep([xs, ys, zs], k=5, s=1) # type: ignore
-    new_points = spl(np.linspace(0, 1, 100))
+    spl, _ = make_splprep([xs, ys, zs], k=5, s=1) 
+    new_points: NDArray[np.float64] = spl(np.linspace(0, 1, 100))   # type: ignore
 
-    return new_points, spl.c
+    return new_points, spl.c    # type: ignore
 
 
-def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tuple[NDArray, NDArray, float]]:
+def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tuple[NDArray[np.float64], NDArray[np.float64], float]]:
     max_degree = 0
     for line in lines:
         errs: dict[int, float] = {}
@@ -58,7 +59,7 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tup
     return {line.id: fit_bezier(line, max_degree, get_points) for line in lines}
 
 
-def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArray, NDArray, float]:
+def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArray[np.float64], NDArray[np.float64], float]:
     A = get_bezier_matrix(line, degree)
     xs = np.array([coord.to_3D().x for coord in line.coords])
     ys = np.array([coord.to_3D().y for coord in line.coords])
@@ -87,7 +88,7 @@ def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArr
 
 def get_ts(line: Line) -> list[float]:
     total_length = 0
-    dists = []
+    dists: list[float] = []
     for i in range(len(line.coords)-1):
         l0 = line.coords[i]
         l1 = line.coords[i+1]
@@ -113,7 +114,7 @@ def bernstein_polynomial(t: float, v: int, n: int) -> float:
     return nv * math.pow(t, v) * math.pow(1-t, n-v)
 
 
-def get_bezier_matrix(line: Line, n: int) -> NDArray:
+def get_bezier_matrix(line: Line, n: int) -> NDArray[np.float_]:
     ts = get_ts(line)
 
     A = np.zeros(shape=(len(ts), n+1))
@@ -125,6 +126,6 @@ def get_bezier_matrix(line: Line, n: int) -> NDArray:
     return A
 
 
-def get_error(real_values: NDArray, approximation: NDArray) -> float:
+def get_error(real_values: NDArray[np.float_], approximation: NDArray[np.float_]) -> float:
     squared_diff = np.sum((real_values - approximation)**2, axis=1)
     return np.sum(squared_diff)
