@@ -1,6 +1,3 @@
-from matplotlib.lines import Line2D
-from numpy.typing import NDArray
-from shapely.geometry import LineString
 from coords import Coord3D
 from desc_stats import standard_deviation, total_distance_from_median
 from fitting import fit_bezier, fit_bezier_all, fit_spline
@@ -14,9 +11,12 @@ import geopandas as gpd
 import cartopy.feature as cfeature
 import numpy as np
 from kneed import KneeLocator
+from matplotlib.lines import Line2D
+from numpy.typing import NDArray
+from shapely.geometry import LineString
 
 
-def test_bezier_cluster(settings: Settings, data: Data):
+def test_standard_deviation(settings: Settings, data: Data):
     networks = load_networks("networks.json")
     dist_threshold = 50
     dist_ratio = 0.05
@@ -31,7 +31,7 @@ def test_bezier_cluster(settings: Settings, data: Data):
     splines = fit_bezier_all(lines)
 
     fig = plt.figure(figsize=(16, 9))
-    ax = fig.add_subplot(111, projection="3d")
+    ax = fig.add_subplot(projection="3d")
     colors = ["#053a8d", "#0b9dce", "#098945", "#83bf1c", "#ec000b", "#ff872e", "#7b45b5", "#d883fc", "#a45700", "#ffbf00"]
 
     for line in lines:
@@ -50,7 +50,7 @@ def test_bezier_cluster(settings: Settings, data: Data):
         y = sd[1] * np.outer(np.sin(u), np.sin(v)) + centroid[1]
         z = sd[2] * np.outer(np.ones(np.size(u)), np.cos(v)) + centroid[2]
 
-        ax.plot_surface(x, y, z, alpha=0.25, color=colors[i])
+        ax.plot_surface(x, y, z, alpha=0.25, color=colors[i])   # type: ignore
 
     plt.tight_layout()
     plt.show()
