@@ -1,10 +1,11 @@
 from coords import Coord3D
-from desc_stats import standard_deviation, total_distance_from_median
-from fitting import fit_bezier, fit_bezier_all, fit_spline
+from desc_stats import detect_outlier_splines, standard_deviation, total_distance_from_median
+from fitting import evaluate_bezier, fit_bezier, fit_bezier_all, fit_spline
 from line_reader import dateline_fix
 from utility import Data, Settings, load_networks
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import to_rgba
 import cartopy.crs as ccrs  # type: ignore
 import pandas as pd
 import geopandas as gpd
@@ -14,6 +15,120 @@ from kneed import KneeLocator
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 from shapely.geometry import LineString
+
+
+def test_confidence_band(settings: Settings, data: Data):
+    networks = load_networks("networks.json")
+    dist_threshold = 50
+    dist_ratio = 0.05
+    
+    key = settings.sim_start + str(settings.time_offset) + str(dist_threshold) + str(dist_ratio) + settings.line_type
+    node_clusters = networks[key]["node_clusters"]
+
+    largest_cluster = int(max(networks[key]["clusters"], key=lambda k: len(networks[key]["clusters"][k])))
+    line_ids = [line_id for line_id, cluster_id in node_clusters.items() if cluster_id == largest_cluster]
+    lines = [line for line in data.lines if line.id in line_ids]
+
+    splines = fit_bezier_all(lines)
+    coeffs = np.array([cs for cs, _, _ in splines.values()])
+
+    outlier_indices = detect_outlier_splines(coeffs)
+    clean_coeffs = np.array([cs for i, cs in enumerate(coeffs) if i not in outlier_indices])
+
+    coeffs_i = [clean_coeffs[:, i] for i in range(len(clean_coeffs[0]))]
+    svcs = [standard_deviation(cs) for cs in coeffs_i]
+
+    centroids = np.array([svc[2] for svc in svcs])
+    degree = len(centroids)-1
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    for i, line in enumerate(lines):
+        geometry = [LineString([coord.to_list() for coord in line.coords])]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+
+        if i in outlier_indices:
+            gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="red", zorder=0, linewidth=1, linestyle=":")
+        # else:
+        #     gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="#0000ff33", zorder=0, linewidth=1)
+
+
+    spline_points = evaluate_bezier(degree, centroids, 100)
+    spline_points_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in spline_points]
+    geometry = [LineString(spline_points_geo)]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="blue", zorder=100, linewidth=4)
+
+    all_curve_points = []
+    for i, line in enumerate(lines):
+        if i in outlier_indices:
+            continue
+        cs, _, _ = splines[line.id]
+        curve_points = evaluate_bezier(degree, cs, 100)
+        all_curve_points.append(curve_points)
+    
+    all_curve_points = np.array(all_curve_points)
+    
+    sds_normal = np.zeros(100)
+    for i in range(100):
+        points_at_i = all_curve_points[:, i, :]
+        mean_point = spline_points[i]
+        
+        distances = np.sqrt(np.sum((points_at_i - mean_point) ** 2, axis=1))
+        
+        sds_normal[i] = np.std(distances)
+    
+    confidence_scale = 1.5
+    
+    normals = np.zeros((100, 3))
+    for i in range(1, 99):
+        tangent = spline_points[i+1] - spline_points[i-1]
+        tangent = tangent / np.linalg.norm(tangent)
+        
+        radial = spline_points[i] / np.linalg.norm(spline_points[i])
+        
+        tangent = tangent - np.dot(tangent, radial) * radial
+        tangent = tangent / np.linalg.norm(tangent)
+        
+        normal = np.cross(tangent, radial)
+        normal = normal / np.linalg.norm(normal)
+        
+        normals[i] = normal
+    
+    normals[0] = normals[1]
+    normals[99] = normals[98]
+    
+    upper_band = np.zeros_like(spline_points)
+    lower_band = np.zeros_like(spline_points)
+    
+    for i in range(100):
+        band_width = sds_normal[i] * confidence_scale
+        upper_band[i] = spline_points[i] + normals[i] * band_width
+        lower_band[i] = spline_points[i] - normals[i] * band_width
+    
+    upper_band_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in upper_band]
+    lower_band_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in lower_band]
+
+    upper_x = [point[0] for point in upper_band_geo]
+    upper_y = [point[1] for point in upper_band_geo]
+    lower_x = [point[0] for point in lower_band_geo]
+    lower_y = [point[1] for point in lower_band_geo]
+    
+    x_fill = np.concatenate([lower_x, upper_x[::-1]])
+    y_fill = np.concatenate([lower_y, upper_y[::-1]])
+    
+    ax.fill(x_fill, y_fill, color=to_rgba('purple', 0.2), zorder=1)
+
+    geometry = [LineString(upper_band_geo), LineString(lower_band_geo)]
+    gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+    gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="purple", zorder=2, linewidth=2)
+
+    plt.tight_layout()
+    plt.show()
 
 
 def test_standard_deviation(settings: Settings, data: Data):
@@ -40,7 +155,7 @@ def test_standard_deviation(settings: Settings, data: Data):
 
     for i in range(len(splines[list(splines.keys())[0]][0])):
         coeffs = np.array([cs[i] for cs, _, _ in splines.values()])
-        sd, centroid = standard_deviation(coeffs)
+        sd, _, centroid = standard_deviation(coeffs)
 
         ax.scatter(coeffs[:, 0], coeffs[:, 1], coeffs[:, 2], c=colors[i], alpha=0.5)
 
@@ -51,6 +166,8 @@ def test_standard_deviation(settings: Settings, data: Data):
         z = sd[2] * np.outer(np.ones(np.size(u)), np.cos(v)) + centroid[2]
 
         ax.plot_surface(x, y, z, alpha=0.25, color=colors[i])   # type: ignore
+
+
 
     plt.tight_layout()
     plt.show()

@@ -1,10 +1,10 @@
-import math
 from coords import Coord3D
 from line_reader import Line, dateline_fix
 
+import math
+
 from numpy.typing import NDArray
 from scipy.interpolate import BSpline, make_splprep  # type: ignore
-
 import numpy as np
 from kneed import KneeLocator
 
@@ -54,7 +54,7 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tup
             continue
 
         max_degree = max(max_degree, elbow)
-
+ 
     print(f"Fit bezier splines of degree: {max_degree}")
     return {line.id: fit_bezier(line, max_degree, get_points) for line in lines}
 
@@ -76,14 +76,18 @@ def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArr
     if not get_points:
         return cs, np.array(0), error
 
-    interval = np.linspace(0, 1, 100)
-    E = np.zeros((len(interval), degree+1))
-    for i, t in enumerate(interval):
+    curve_points = evaluate_bezier(degree, cs, 100)
+    return cs, curve_points, error
+
+
+def evaluate_bezier(degree: int, cs: NDArray[np.float_], num_pts: int) -> NDArray[np.float_]:
+    ts = np.linspace(0, 1, num_pts)
+    E = np.zeros((len(ts), degree+1))
+    for i, t in enumerate(ts):
         for j in range(degree+1):
             E[i, j] = bernstein_polynomial(t, j, degree)
 
-    curve_points = np.dot(E, cs)
-    return cs, curve_points, error
+    return np.dot(E, cs)
 
 
 def get_ts(line: Line) -> list[float]:
