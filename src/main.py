@@ -129,6 +129,7 @@ if __name__ == "__main__":
     print("Initialized")
    
     # testing.test_standard_deviation(settings, data)
-    testing.test_confidence_band(settings, data)
+    # testing.test_confidence_band(settings, data)
+    testing.test_clustering(settings, data)
 
     # main(settings, data)

@@ -4,17 +4,17 @@ import numpy as np
 from fitting import bernstein_polynomial
 
 
-def mean_distance_from_median(coeffs: NDArray[np.float_], median_coeffs: NDArray[np.float_]) -> float:
-    distances: NDArray[np.float_] = np.sqrt(np.sum((coeffs - median_coeffs) ** 2, axis=1))
+def mean_distance_from_median(coeffs: NDArray[np.float64], median_coeffs: NDArray[np.float64]) -> float:
+    distances: NDArray[np.float64] = np.sqrt(np.sum((coeffs - median_coeffs) ** 2, axis=1))
     return np.mean(distances)   # type: ignore
 
 
-def total_distance_from_median(coeffs: NDArray[np.float_], median_coeffs: NDArray[np.float_]) -> float:
+def total_distance_from_median(coeffs: NDArray[np.float64], median_coeffs: NDArray[np.float64]) -> float:
     distances = np.sqrt(np.sum((coeffs - median_coeffs) ** 2, axis=1))
     return np.sum(distances)
 
 
-def standard_deviation(points: NDArray[np.float_]) -> tuple[NDArray[np.float_], NDArray[np.float_], NDArray[np.float_]]:
+def standard_deviation(points: NDArray[np.float64]) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     centroid = np.mean(points, axis=0)
     squared_deviations = (points - centroid)**2
     variance = np.mean(squared_deviations, axis=0)
@@ -22,7 +22,7 @@ def standard_deviation(points: NDArray[np.float_]) -> tuple[NDArray[np.float_], 
     return np.sqrt(variance), variance, centroid
 
 
-def spline_sd(degree: int, num_pts: int, variances: NDArray[np.float_]):
+def spline_sd(degree: int, num_pts: int, variances: NDArray[np.float64]):
     ts = np.linspace(0, 1, num_pts)
 
     vars_ts = []
@@ -40,7 +40,7 @@ def spline_sd(degree: int, num_pts: int, variances: NDArray[np.float_]):
     return np.sqrt(vars_ts)
 
 
-def detect_outlier_splines(coeffs: NDArray[np.float_]):
+def detect_outlier_splines(coeffs: NDArray[np.float64]):
     outlier_indices = set()
     
     for i in range(coeffs.shape[1]):

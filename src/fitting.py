@@ -50,7 +50,6 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tup
         kneedle = KneeLocator(x, y, S=1.0, curve="convex", direction="decreasing")
         elbow = kneedle.elbow
         if elbow == None:
-            print("Couldn't find elbow")
             continue
 
         max_degree = max(max_degree, elbow)
@@ -80,7 +79,7 @@ def fit_bezier(line: Line, degree: int, get_points: bool = False) -> tuple[NDArr
     return cs, curve_points, error
 
 
-def evaluate_bezier(degree: int, cs: NDArray[np.float_], num_pts: int) -> NDArray[np.float_]:
+def evaluate_bezier(degree: int, cs: NDArray[np.float64], num_pts: int) -> NDArray[np.float64]:
     ts = np.linspace(0, 1, num_pts)
     E = np.zeros((len(ts), degree+1))
     for i, t in enumerate(ts):
@@ -118,7 +117,7 @@ def bernstein_polynomial(t: float, v: int, n: int) -> float:
     return nv * math.pow(t, v) * math.pow(1-t, n-v)
 
 
-def get_bezier_matrix(line: Line, n: int) -> NDArray[np.float_]:
+def get_bezier_matrix(line: Line, n: int) -> NDArray[np.float64]:
     ts = get_ts(line)
 
     A = np.zeros(shape=(len(ts), n+1))
@@ -130,6 +129,6 @@ def get_bezier_matrix(line: Line, n: int) -> NDArray[np.float_]:
     return A
 
 
-def get_error(real_values: NDArray[np.float_], approximation: NDArray[np.float_]) -> float:
+def get_error(real_values: NDArray[np.float64], approximation: NDArray[np.float64]) -> float:
     squared_diff = np.sum((real_values - approximation)**2, axis=1)
     return np.sum(squared_diff)

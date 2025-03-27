@@ -15,6 +15,77 @@ from kneed import KneeLocator
 from matplotlib.lines import Line2D
 from numpy.typing import NDArray
 from shapely.geometry import LineString
+from scipy.cluster.vq import kmeans2, whiten
+from scipy.spatial.distance import cdist
+import colorcet as cc
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+from sklearn.neighbors import NearestNeighbors
+
+
+def test_clustering(settings: Settings, data: Data):
+    splines = fit_bezier_all(data.lines, True)
+    coeffs = np.array([cs for cs, _, _ in splines.values()])
+    reshaped_coeffs = coeffs.reshape(coeffs.shape[0], -1)
+
+    scaler = StandardScaler()
+    reshaped_coeffs_scaled = scaler.fit_transform(reshaped_coeffs)
+    
+    clustering = DBSCAN(eps=5, min_samples=10).fit(reshaped_coeffs_scaled)
+
+    neighbors = NearestNeighbors(n_neighbors=10)
+    neighbors_fit = neighbors.fit(reshaped_coeffs_scaled)
+    distances, indices = neighbors_fit.kneighbors(reshaped_coeffs_scaled)
+
+    distances = np.sort(distances[:, 9])  # Distance to the 10th nearest neighbor
+    print(distances[0])
+
+
+    # whitened = whiten(reshaped_coeffs)
+    # 
+    # errors = []
+    # min_k = 1
+    # max_k = 50
+    # 
+    # ks = range(min_k, max_k)
+    # for k in ks:
+    #     centroids, labels = kmeans2(whitened, k, minit="++")
+    #     
+    #     distances = cdist(whitened, centroids)
+    #     min_distances = np.min(distances, axis=1)
+    #     error = np.mean(min_distances**2)
+    #     
+    #     errors.append(error)
+    #
+    # kneedle = KneeLocator(ks, errors, S=1.0, curve="convex", direction="decreasing")
+    #
+    #
+    # k = kneedle.elbow
+    # print(k)
+    # _, labels = kmeans2(whitened, k, minit="++")
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+
+    colors = cc.b_glasbey_bw
+
+    for i, (_, pts, _) in enumerate(splines.values()):
+        coords = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat() for pt in pts]
+        max_lon = max(coords, key=lambda c: c.lon).lon
+        min_lon = min(coords, key=lambda c: c.lon).lon
+        if max_lon - min_lon > 180:
+            coords = dateline_fix(coords)
+
+        geometry = [LineString([coord.to_list() for coord in coords])]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors[clustering.labels_[i]])
+
+
+    plt.tight_layout()
+    plt.show()
 
 
 def test_confidence_band(settings: Settings, data: Data):
