@@ -50,7 +50,7 @@ def fit_bezier_all(lines: list[Line], get_points: bool = False) -> dict[str, tup
         kneedle = KneeLocator(x, y, S=1.0, curve="convex", direction="decreasing")
         elbow = kneedle.elbow
         if elbow == None:
-            print("Couldn't find elbow")
+            # print("Couldn't find elbow")
             continue
 
         max_degree = max(max_degree, elbow)
