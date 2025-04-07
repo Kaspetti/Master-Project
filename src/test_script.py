@@ -3,6 +3,7 @@ from desc_stats import detect_outlier_splines, standard_deviation, total_distanc
 from fitting import evaluate_bezier, fit_bezier, fit_bezier_all, fit_spline
 from line_reader import dateline_fix
 from utility import Data, Settings, load_networks
+import cluster
 
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgba
@@ -17,6 +18,148 @@ from numpy.typing import NDArray
 from shapely.geometry import LineString
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+import colorcet as cc
+
+
+def test_clustering_confidence_band(settings: Settings, data: Data):
+    splines = fit_bezier_all(data.lines)
+    coeffs = np.array([cs for cs, _, _ in splines.values()])
+    centroids = np.array([np.sum(cs, axis=0) / len(cs) for cs in coeffs])
+
+    fig = plt.figure(figsize=(16, 9))
+    ax = fig.add_subplot(111, projection=ccrs.PlateCarree())
+    ax.add_feature(cfeature.LAND, facecolor="white", edgecolor="black")   # type: ignore
+    ax.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
+    ax.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
+    
+    colors = cc.b_glasbey_bw
+
+    current_ens = 0
+    max_current_ens = 0
+    min_max_ens = 100
+    for line in data.lines:
+        ens_line_id = line.id.split("|")
+        if int(ens_line_id[0]) == current_ens:
+            max_current_ens = max(max_current_ens, int(ens_line_id[1]))
+        else:
+            min_max_ens = min(min_max_ens, max_current_ens)
+            max_current_ens = int(ens_line_id[1])
+            current_ens = int(ens_line_id[0])
+
+    min_k = min_max_ens
+    max_k = 25
+
+    outer_clusters = cluster.cluster_centroids(centroids, min_k, max_k)
+    # selected_cluster = 8
+    selected_cluster = 2
+
+    outer_cluster_lines = [line for i, line in enumerate(data.lines) if outer_clusters[i] == selected_cluster]    # type: ignore
+
+    cluster_splines = [splines[line.id] for line in outer_cluster_lines]
+    cluster_coeffs = np.array([cs for cs, _, _ in cluster_splines])
+    cluster_centroids = np.array([np.sum(cs, axis=0) / len(cs) for cs in cluster_coeffs])
+
+    min_k = 1
+    max_k = 10
+
+    inner_clusters = cluster.cluster_centroids(cluster_centroids, min_k, max_k) 
+    for c in set(inner_clusters):   # type: ignore
+        focus_lines = [line for i, line in enumerate(outer_cluster_lines) if inner_clusters[i] == c]    # type: ignore
+        focus_splines = [splines[line.id] for line in focus_lines]
+        focus_coeffs = np.array([cs for cs, _, _ in focus_splines])
+        
+        outlier_indices = detect_outlier_splines(focus_coeffs)
+        clean_coeffs = np.array([cs for i, cs in enumerate(focus_coeffs) if i not in outlier_indices])
+
+        coeffs_i = [clean_coeffs[:, i] for i in range(len(clean_coeffs[0]))]
+        svcs = [standard_deviation(cs) for cs in coeffs_i]
+
+        centroids = np.array([svc[2] for svc in svcs])
+        degree = len(centroids)-1
+
+
+        for i, line in enumerate(focus_lines):
+            geometry = [LineString([coord.to_list() for coord in line.coords])]
+            gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+
+            if i in outlier_indices:
+                gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color="black", zorder=0, linewidth=1, linestyle=":")
+            else:
+                gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors[c]+"55", zorder=1, linewidth=1)
+
+
+        spline_points = evaluate_bezier(degree, centroids, 100)
+        spline_points_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in spline_points]
+        geometry = [LineString(spline_points_geo)]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors[c], zorder=100, linewidth=4)
+
+        all_curve_points = []
+        for i, line in enumerate(focus_lines):
+            if i in outlier_indices:
+                continue
+            cs, _, _ = splines[line.id]
+            curve_points = evaluate_bezier(degree, cs, 100)
+            all_curve_points.append(curve_points)
+        
+        all_curve_points = np.array(all_curve_points)
+        
+        sds_normal = np.zeros(100)
+        for i in range(100):
+            points_at_i = all_curve_points[:, i, :]
+            mean_point = spline_points[i]
+            
+            distances = np.sqrt(np.sum((points_at_i - mean_point) ** 2, axis=1))
+            
+            sds_normal[i] = np.std(distances)
+        
+        confidence_scale = 1.5
+        
+        normals = np.zeros((100, 3))
+        for i in range(1, 99):
+            tangent = spline_points[i+1] - spline_points[i-1]
+            tangent = tangent / np.linalg.norm(tangent)
+            
+            radial = spline_points[i] / np.linalg.norm(spline_points[i])
+            
+            tangent = tangent - np.dot(tangent, radial) * radial
+            tangent = tangent / np.linalg.norm(tangent)
+            
+            normal = np.cross(tangent, radial)
+            normal = normal / np.linalg.norm(normal)
+            
+            normals[i] = normal
+        
+        normals[0] = normals[1]
+        normals[99] = normals[98]
+        
+        upper_band = np.zeros_like(spline_points)
+        lower_band = np.zeros_like(spline_points)
+        
+        for i in range(100):
+            band_width = sds_normal[i] * confidence_scale
+            upper_band[i] = spline_points[i] + normals[i] * band_width
+            lower_band[i] = spline_points[i] - normals[i] * band_width
+        
+        upper_band_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in upper_band]
+        lower_band_geo = [Coord3D(pt[0], pt[1], pt[2]).to_lon_lat().to_list() for pt in lower_band]
+
+        upper_x = [point[0] for point in upper_band_geo]
+        upper_y = [point[1] for point in upper_band_geo]
+        lower_x = [point[0] for point in lower_band_geo]
+        lower_y = [point[1] for point in lower_band_geo]
+        
+        x_fill = np.concatenate([lower_x, upper_x[::-1]])
+        y_fill = np.concatenate([lower_y, upper_y[::-1]])
+        
+        ax.fill(x_fill, y_fill, color=to_rgba(colors[c], 0.2), zorder=1)
+
+        geometry = [LineString(upper_band_geo), LineString(lower_band_geo)]
+        gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
+        gdf.plot(ax=ax, transform=ccrs.PlateCarree(), color=colors[c], zorder=2, linewidth=2)
+
+    plt.tight_layout()
+    plt.show()
 
 
 def test_double_clustering_centroids(settings: Settings, data: Data):
@@ -34,17 +177,14 @@ def test_double_clustering_centroids(settings: Settings, data: Data):
     ax1.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
     ax1.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
 
-    inertias: list[float]= [KMeans(n_clusters=k, random_state=0, n_init="auto").fit(centroids).inertia_ for k in range(min_k, max_k)]   # type: ignore
-    kneedle = KneeLocator(range(min_k, max_k), inertias, S=kneedle_sensitivity, curve="convex", direction="decreasing")
-
-    kmeans = KMeans(n_clusters=kneedle.elbow, random_state=0, n_init="auto").fit(centroids) # type: ignore
+    labels = cluster.cluster_centroids(centroids, min_k, max_k, kneedle_sensitivity)
 
     geometry = []
     for line in data.lines:
         geometry.append(LineString([coord.to_list() for coord in line.coords]))
         
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
-    gdf["clusters"] = kmeans.labels_
+    gdf["clusters"] = labels
     gdf.plot(ax=ax1, transform=ccrs.PlateCarree(), column="clusters", categorical=True)
 
     # Test double clustering
@@ -53,8 +193,8 @@ def test_double_clustering_centroids(settings: Settings, data: Data):
     ax2.add_feature(cfeature.OCEAN, facecolor="lightgrey")     # type: ignore 
     ax2.add_feature(cfeature.BORDERS, linestyle=':', edgecolor="darkgrey")    # type: ignore
 
-    selected_cluster = 4
-    cluster_lines = [line for i, line in enumerate(data.lines) if kmeans.labels_[i] == selected_cluster]    # type: ignore
+    selected_cluster = 0
+    cluster_lines = [line for i, line in enumerate(data.lines) if labels[i] == selected_cluster]    # type: ignore
 
     cluster_splines = [splines[line.id] for line in cluster_lines]
     cluster_coeffs = np.array([cs for cs, _, _ in cluster_splines])
@@ -62,17 +202,15 @@ def test_double_clustering_centroids(settings: Settings, data: Data):
 
     min_k = 1
     max_k = 10
-    inertias: list[float]= [KMeans(n_clusters=k, random_state=0, n_init="auto").fit(cluster_centroids).inertia_ for k in range(min_k, max_k)]   # type: ignore
-    kneedle = KneeLocator(range(min_k, max_k), inertias, S=1.0, curve="convex", direction="decreasing")
 
-    kmeans = KMeans(n_clusters=kneedle.elbow, random_state=0, n_init="auto").fit(cluster_centroids) # type: ignore
+    labels = cluster.cluster_centroids(cluster_centroids, min_k, max_k, kneedle_sensitivity) 
 
     geometry = []
     for line in cluster_lines:
         geometry.append(LineString([coord.to_list() for coord in line.coords]))
         
     gdf = gpd.GeoDataFrame(pd.DataFrame(), geometry=geometry, crs="EPSG:4326")  # type: ignore
-    gdf["clusters"] = kmeans.labels_
+    gdf["clusters"] = labels
     gdf.plot(ax=ax2, transform=ccrs.PlateCarree(), column="clusters", categorical=True)
 
     plt.tight_layout()

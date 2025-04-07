@@ -15,7 +15,7 @@
   "reportUntypedBaseClass": true,
   "reportUntypedNamedTuple": true,
   "reportFunctionMemberAccess": true,
-  "pythonVersion": "3.10",
+  "pythonVersion": "3.11",
   "exclude": [
     "**/node_modules",
     "**/__pycache__",

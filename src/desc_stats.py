@@ -58,3 +58,7 @@ def detect_outlier_splines(coeffs: NDArray[np.float_]):
                 outlier_indices.add(j)
     
     return list(outlier_indices)
+
+
+def create_confidence_band():
+    pass

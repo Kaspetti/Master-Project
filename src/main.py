@@ -128,7 +128,8 @@ if __name__ == "__main__":
     settings, data = init()
     print("Initialized")
 
-    testing.test_double_clustering_centroids(settings, data)
+    testing.test_clustering_confidence_band(settings, data)
+    # testing.test_double_clustering_centroids(settings, data)
     # testing.test_clustering(settings, data)
    
     # testing.test_standard_deviation(settings, data)
