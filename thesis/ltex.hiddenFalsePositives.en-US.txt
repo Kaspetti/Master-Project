@@ -1,0 +1,1 @@
+{"rule":"IN_WHO","sentence":"^\\QHere it is important to be clear about who the audience is.\\E$"}

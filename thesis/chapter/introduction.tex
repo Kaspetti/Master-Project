@@ -1,0 +1,33 @@
+\chapter{Introduction}
+Most people regard weather forecasts as a small part of the end of the daily news on TV—a person waving their arms with pictures of clouds on a map behind them. Many do not think about the amount of work and the extent of the data involved in making these forecasts. 
+Each day, multiple times per day, meteorologists try to predict how the weather going forward will develop. They do this by running complex simulations based on the current variables in the atmosphere and see how they affect each other and change over time. These variables, however, are highly volatile, and minor changes to the starting parameters may provide drastic differences as the simulation time increases. These simulations are imperfect, and tiny errors in the starting parameters may result in a wrong prediction. To combat this, meteorologists may run as much as $50$ of these simulations simultaneously, but with minor changes in the starting parameters, creating an ensemble of simulations. By doing this, they have a higher chance of capturing reality and seeing how each parameter affects the result. However, now they have $50$ predictions, and one prediction has to be chosen and compared to all others. Let us say that one ensemble member describes $15$ features in the form of lines on a map; this makes for a total of $15 \times 50 = 750$ lines across the entire ensemble. A common way to visualize this is using a \gls{spaghetti}. A problem with Spaghetti Plots is that they get cluttered quickly, making it hard to find features of interest or identify similar features across ensemble members. The high dimensionality of the data also makes standard methods for visualizing the descriptive statistics of ensembles non-viable. We require a better way to visualize data of this magnitude to aid domain experts in making decisions and better their understanding of the data.
+
+In this thesis, we will start by outlining the tasks we want to accomplish by visualizing this data and the requirements for doing so. We will then review the necessary background to understand this thesis's contents, mainly regarding meteorology. Next, we will propose our solution to the problem, explain how we solved the tasks we set out to solve, and describe the results of our efforts. We will explain important implementation details before we discuss possible shortcomings and possibilities for future work with our method. Lastly, we will summarize and briefly discuss the conclusions of this work. 
+
+\section{Tasks}
+Munzner\cite{munzner2014} recommends anyone designing a visualization to define and abstract the tasks they want to accomplish clearly. In this thesis, we focus on meteorology, but by abstracting these tasks into more general goals, we can apply the same methods to other fields. In this thesis, we will divide our tasks into three categories:
+\subsection{Exploration}
+When a user is unfamiliar with the data, they will begin exploring it. By doing this, they want to get an overview of the data and locate areas of interest. We want to support the following exploration tasks:
+\begin{itemize}
+    \item Easy detection of outliers. Outliers include lines in irregular places and lines of irregular shapes.
+    \item Identification of interesting patterns.
+    \item Examine how lines change over time.
+\end{itemize}
+\subsection{Analysis}
+When the user has a hypothesis about some part of the data, they often want to analyze it. By delving deeper into the data, they can validate their hypothesis or develop new ones. We want to support the following analysis tasks:
+\begin{itemize}
+    \item Easy detection of outliers within a cluster. Outliers include lines in irregular places and lines of irregular shapes.
+    \item Show a measure of centrality and spread in a cluster of lines providing a cleaner visualization of the cluster as opposed to other methods like the spaghetti plot.
+    \item Compare or identify relationships between clusters.
+\end{itemize}
+\subsection{Presentation}
+Once the user makes a conclusion about the data, they may want to present it to others. Here, it is important to be clear about their audience and what they want to show. We want to support the following presentation tasks for a general audience:
+\begin{itemize}
+    \item Show a statistically aggregated view of each cluster of lines in an intuitive way.
+    \item Incorporate interactive elements to make viewing and exploring the entire data easier.
+    \item Provide descriptions of the visual design to aid in understanding the features and patterns.
+\end{itemize}
+
+\section{Requirements}
+
+\section{Background}
